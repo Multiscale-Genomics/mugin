@@ -1,0 +1,81 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="description" content="" />
+    <meta name="author" content="The MuG project" />
+    <link rel="icon" href="favicon.ico" />
+    
+    <title>The MuG Information Network</title>
+    
+    <script type="text/javascript" src="SpryAssets/SpryMenuBar.js"></script>
+    <script src="js/vendor/d3.v3.js"></script>
+    <script src="js/vendor/jquery.min.js"></script>
+    <script src="js/mugin.js"></script>
+    <link href="css/MuG.css" rel="stylesheet" type="text/css" media="all" />
+    <link href="SpryAssets/SpryMenuBarHorizontal.css" rel="stylesheet" type="text/css" media="all" />
+    <link href="css/mugin.css" rel="stylesheet" />
+  </head>
+  
+  <body>
+    <div id="container">
+      
+      <!-- HEADER: MuG logo -->
+      <div id="header">
+	<p align="left"><img src="images/topWeb.png" alt="MuG" width="900" height="124" /></p>
+	<p align="center"><strong>The MuG Information Network</strong>. </p>
+      </div>
+      <div id="menu">
+	<ul id="MenuBar1" class="MenuBarHorizontal">
+	  <!-- <li><a href="#intro" class="menuItem">Introduction</a></li> -->
+	  <!-- <li><a href="#flexibility" class="menuItem">Flex Browser</a></li> -->
+	</ul>
+      </div>
+      <div style='clear:both'></div>
+      
+      <!-- Main content -->
+      <div id="content">
+	
+	<div id="intro">
+	</div>
+	
+	<div id="data">
+	  <!-- <h3></h3> -->
+	  <div id="graph">
+	    <script type="text/javascript">
+              var mat = datagraph("#graph", "mugdata.tsv");
+            </script>
+	  </div>
+	  <div id="selector-hp" class="selector">
+	  </div>
+	</div>	
+      </div>
+
+      <div id="footnotes">
+	<h3>References and Footnotes</h3>
+	<ol class="publist">
+	  <li>...</li>
+	  <li>...</li>
+	  <li>...</li>
+	  <li>...</li>
+	</ol>
+	<dl class="footnotes">
+	  <!-- <dd><sup id="fn1">1. Missing cells in the matrix refer to -->
+	  <!--     tetranucleotides whose opposite strand read is present elsewhere in the matrix; e.g. CATA is missing, but TATG is present; see also Pasi <i>et al.</i>, 2015. <a href="#ref1" title="Back.">[Back]</a></sup></dd> -->
+	  <!-- <dd><sup id="fn2">2. Colormaps "RdBu 9", "BrBG 10", "Spectral 11" courtesy of <a href="http://colorbrewer2.org">Color Brewer 2</a>. <a href="#ref2" title="Back.">[Back]</a></sup></dd> -->
+	</dl>
+      </div>
+      
+      <!-- FOOTER: MuG info -->
+      <div id="footer">
+	<table width="100%" cellpadding="4">
+	  <tr>
+            <td><img src="images/flag_yellow_high.jpg" alt="EU Logo" width="78" height="51" /></td>
+            <td>This project has  received funding from the European Union's Horizon 2020 research and innovation  programme under grant agreement No 676556.</td>
+	  </tr>
+	</table>
+      </div>
+	
+    </div>
+  </body>
+</html>
