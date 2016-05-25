@@ -3,16 +3,11 @@ p {margin: 10px}
 .small {font-size: 80%}
 
 #graph {
+    position: relative;
     float: left;
     margin: auto;
-    padding: 2.5% 0;
+    padding: 0;
     background: #fafafa;
-}
-
-.selector {
-    text-align: right;
-    padding: 0 4% 0 0;
-    clear: right;
 }
 
 #footnotes {
@@ -23,10 +18,70 @@ dl.footnotes dd {
     margin-left: 20px;
 }
 
+/* metadata */
+#metadata {
+    display: block;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    border: 2px solid #777;
+    border-radius: 10px;
+    width: 280px;
+    min-height: 200px;
+    padding: 0;
+    overflow: hidden;
+    z-index: 1000;
+    background: rgba(250,250,250,0.5);
+}
+
+#metadata table {
+    margin: 0;
+    padding: 0;
+    border-spacing: 0;
+    width: 100%;
+}
+
+#metadata td,
+#metadata th {
+    padding: 0 5px;
+    vertical-align: top;
+    text-align: left;
+}
+
+#metadata th {
+    background-color: #777;
+    color: #fff;
+    line-height: 175%;
+}
+
+th.done {
+}
+th.todo {
+}
+th.maybe {
+}
+
+.metadata_toolbox {
+    position: absolute;
+    bottom: 0px;
+    width: 100%;
+    border-top: 2px solid #777;
+    padding: 5px 2.5px 0 2.5px;
+}
+.metadata_toolbox .item {
+    color: #777;
+    margin: 0 2.5px;
+}
+
+
 /* SVG */
 .node {
     fill: rgba(200,200,200,0.75);
     stroke: #333;
+    stroke-width: 4px;
+}
+
+.fixed {
     stroke-width: 2px;
 }
 
@@ -40,6 +95,30 @@ dl.footnotes dd {
     fill: none;
     stroke: #777;
     stroke-width: 4;
+}
+
+.link:hover {
+    stroke-width: 6;
+}
+
+/* toolbox */
+.toolbox rect {
+    fill: none;
+    stroke: #000;
+    stroke-width: 1;
+}
+
+/* legend */
+.legendbox {
+    fill: none;
+    stroke: #000;
+}
+
+.legend .entry line {
+    stroke-width: 4;
+}
+
+.legend .entry text {
 }
 
 /* Link,arrow types */

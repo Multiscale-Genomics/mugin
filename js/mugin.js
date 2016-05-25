@@ -10,30 +10,56 @@
  *
  * v0.1 160518
  * v0.2 160520
+ * v0.3 160525
  * TODO: 
  *  1. directional links DONE v0.2
  *  2. double links      DONE v0.2
- *  3. improved metadata
+ *  3. improved metadata DONE v0.3
  *  4. editable metadata
  *  5. graph bidimensional sorting
  *  6. multiple entries per link
  *
  */
 
+var nodeinfo = {
+    "MNase":		 "Nucleosome positioning",
+    "RNA-seq":		 "Gene expression",
+    "Histone marks":	 "ChIP-seq data on epigenetic histone modifications",
+    "ChIP-seq":		 "Transcription factor binding",
+    "Hi-C":		 "Chromatin contact matrices",
+    "Models (bp)":	 "Physical models of chromatin at the base-pair resolution",
+    "3D chromatin":	 "Predicted structure of chromatin",
+    "Models (kbp)":	 "Physical models of chromatin at the kilo-base-pair resolution",
+    "DNA MD":		 "Molecular Dynamics simulations of DNA and protein-DNA complexes",
+    "FISH":		 "Microscopy imaging data using fluorescent probes"
+};
+
+
 /* Constants */
 var PI = 3.1415;
 
+/* Types:
+ *  1. available tools: done
+ *  2. demonstrated to be relevant, but no available tools: todo
+ *  3. potentially relevant: maybe
+ */  
 var NTYPES = 3,
-    TYPE_TODO = 0,
-    TYPE_DONE = 1,
+    TYPE_DONE = 0,
+    TYPE_TODO = 1,
     TYPE_MAYBE= 2,
-    TYPE_CLASS=["todo", "done", "maybe"];
+    TYPE_CLASS=["done", "todo", "maybe"],
+    TYPE_DESCRIPTION=["Tools available", "Relevant", "Potential"];
+
+var NFLOWS = 2,
+    FLOW_INFORM = 0,
+    FLOW_CONNECT = 1,
+    FLOW_DESCRIPTION = ["Inform", "Connect"];
 
 /* Configuration */
 var width = 600,
     height = 500,
     transitionDuration = 1000, // ms
-    link_dist = width/4.0,
+    link_dist = Math.min(width,height)/4.0,
     link_spread = 0.2; // radians
 
 /* Globals */
@@ -64,11 +90,12 @@ function addnode(graph, nodename) {
 
     if(graph.nodelist.indexOf(nodename) >= 0)
         return graph.nodelist.indexOf(nodename);
-    
+
+    var th = Math.random() * 2 * PI;
+
     var ret = graph.nodelist.push(nodename);
-    var th  = Math.random() * 2 * PI;
     graph.nodes.push({
-        "x": (1+Math.sin(th))*width/2,
+        "x": (1+Math.sin(th))*width/2, 
         "y": (1+Math.cos(th))*width/2,
         "rx": Math.max(30, nodename.length*4),
         "ry": 30,
@@ -100,7 +127,7 @@ function correctLink(d, dth) {
         y1 : d.target.y - dty,
         dx : dx,
         dy : dy,
-        dr : Math.sqrt(dx * dx + dy * dy)
+        dr : Math.sqrt(dx * dx + dy * dy)*1.4
     };
 }
 
@@ -119,22 +146,128 @@ function patharc(link) {
 
 function textifynode(d) {
     // Return text description of node
-    return "<h3>"+d.name+"</h3>";
+    return `
+        <table>
+        <tr><th colspan="2">Node: ` + d.name + `</th></tr>
+        <tr><td colspan="2">` + nodeinfo[d.name] + `</td></tr>
+        </table>        
+        ` + metadata_toolbox("node");
 }
 
 function textifylink(d) {
     // Return text description of link
-    return "<h3>"+d.source.name+"&mdash;"+d.target.name+"</h3><dl>"+
-        "<dd>Description: " + d.description + "</dd>"+
-        "<dd>Reference: " + d.reference + "</dd>"+
-        "<dd>Tools: " + d.tools + "</dd>"+
-        "</dl>";
+    var linkstr = `
+        <table>
+        <tr><th colspan='2' class='`+TYPE_CLASS[d.type]+`'>Link: ` + d.source.name+"&mdash;"+d.target.name + `</th></tr>
+        <tr><td>Description:</td><td>` + d.description + `</td></tr>
+        <tr><td>Flow:</td><td>` + FLOW_DESCRIPTION[d.flow] + `</td></tr>
+        <tr><td>Type:</td><td>` + TYPE_DESCRIPTION[d.type] + `</td></tr>
+        `;
+    if(d.reference != "" && d.reference != "Missing") {
+        var references = d.reference.split(";");
+        var links = d.links.split(";");
+        var refstr = references.map( function(s,i){
+            return "<a href='http://"+links[i]+"'>"+s+"</a>";
+        }).join("<br/>")
+        linkstr += "<tr><td>Reference:</td><td>" + refstr + "</td></tr>";
+    }
+    if(d.tools != "")
+        linkstr += "<tr><td>Available tools:</td><td>" + d.tools + "</td></tr>";
+    linkstr += "</table>";
+    return linkstr + metadata_toolbox("link");
+}
+
+function metadata_toolbox(type) {
+    var mtstr = `
+        <div class="metadata_toolbox">
+        <a href="#"><span class="item edit" title="Edit `+type+`"><i class="fa fa-pencil-square-o fa-3x"></i></span></a>
+        <a href="#"><span class="item delete" title="Delete `+type+`"><i class="fa fa-times fa-3x"></i></span></a>`;
+    if(type=="node")
+        mtstr += '<a href="#"><span class="item link"><i class="fa fa-link fa-3x" title="Add link"></i></span></a>';
+    return mtstr + "</div>";
+;
+}
+
+function make_toolbox() {
+    var TOOL_SIZE = 40,
+        TOOLmv = 10,
+        TOOLmh = 10;
+    var NTOOL = 3,
+        TOOL_FUN = [circle, hexagon, release],
+        TOOL_ICON = ["images/circle.svg", "images/hexagon.svg", "images/release.svg"];
+    
+    var toolbox = svg.append("g").attr("class","toolbox")
+        .attr("transform","translate("+(width-TOOLmh-TOOL_SIZE*NTOOL)+","+TOOLmv+")")
+        .selectAll(".tool").data(TOOL_FUN);
+    var tool = toolbox.enter().append("g")
+        .attr({
+            class: "tool",
+            transform: function(d,i){
+                return "translate("+i*TOOL_SIZE+",0)";}
+        })
+        .on("click", function (d, i) {
+            TOOL_FUN[i].call();
+        });
+    tool.append("rect")
+        .attr({
+            width: TOOL_SIZE,
+            height: TOOL_SIZE
+        })
+    tool.append("image")
+        .attr({
+            "xlink:href": function(d,i){return TOOL_ICON[i];},
+            width: TOOL_SIZE,
+            height: TOOL_SIZE,
+        });
+}
+
+function make_legend() {
+    var L_WID = 20,
+        L_MRG = 10,
+        L_HIG = 20,
+        L_POSx= 15,
+        L_POSy= 10;
+    
+    var legend = svg.append("g").attr("class","legend");
+    var entries = legend.selectAll(".entry").data(TYPE_CLASS);
+    var Eenter = entries.enter().append("g")
+        .attr({
+            transform: function(d,i){
+                return "translate("+L_POSx+","+(L_POSy+L_HIG*(i+1))+")";
+            },
+            class: "entry"
+        });
+    Eenter.append("line")
+        .attr({
+            y1:-6,
+            x2:L_WID,
+            y2:-6,
+            class: function(d){return d;}
+        });
+    Eenter.append("text")
+        .text(function(d,i){return TYPE_DESCRIPTION[i];})
+        .attr({
+            x: L_WID+L_MRG
+        });
+    var widths = [];
+    Eenter.selectAll("text").each(function(){widths.push(this.getComputedTextLength());});
+    legend.append("rect")
+        .attr({
+            class: "legendbox",
+            x: L_POSx-5,
+            y: L_POSy,
+            rx: 10,
+            ry: 10,
+            width: Math.max.apply(null, widths)+L_WID+L_MRG+10,
+            height: L_HIG*NTYPES+10
+        });
 }
 
 function make_markers() {
     // Create required markers for arrows
     var defs = svg.append("defs");
     var mkw = 3.0;
+
     for(t=0; t<NTYPES; t++) {
         defs.append("marker")
 	.attr({
@@ -166,26 +299,29 @@ function make_markers() {
     }
 }
 
-
 /* Main Datagraph structure */
 // XXX Use the function.call(instance) pattern
 //     to wrap all this into an object with an
 //     assigned id, tsv; then the _this pattern
 //     can be used for callbacks.
-function datagraph(id, tsv) {
+function datagraph(id, csv) {
     svg = d3.select(id).append("svg")
-        .attr("width",  width)
-        .attr("height", height);
+        .attr({
+            width: 900,
+            height: height
+        });
 
     make_markers();
+    make_legend();
+    make_toolbox();
     
     graph.nodelist = []; // temporary structure to accumulate nodes
     graph.linklist = []; // temporary structure to count links
     graph.nodes = [];
     graph.links = [];
         
-    d3.tsv(
-        tsv,
+    d3.csv(
+        csv,
         function(d) {
             // Add nodes
             var src = addnode(graph, d.data1),
@@ -206,13 +342,13 @@ function datagraph(id, tsv) {
             }
             
             // Compute derived variables
-            var flow= 1;
+            var flow= FLOW_INFORM;
             if(d.flow == "<-") {
                 var tmp = src;
                 src=trg;
                 trg=tmp;
             }else if(d.flow == "<->") {
-                flow = 2;
+                flow = FLOW_CONNECT;
             }
             
             /* Types:
@@ -221,10 +357,10 @@ function datagraph(id, tsv) {
              *  3. potentially relevant: maybe
              */  
             var type = TYPE_TODO;
-            if(d.reference == "XXX")
-                type = TYPE_MAYBE;
-            else if(d.tools != "")
+            if(d.tools != "")
                 type = TYPE_DONE;            
+            else if(d.reference == "")
+                type = TYPE_MAYBE;
             
             graph.links.push({
                 "source": src,
@@ -235,6 +371,7 @@ function datagraph(id, tsv) {
                 "notes": d.notes,
                 "tools": d.tools,
                 "type": type,
+                "links": d.links,
                 "weight": weight
             });
         },
@@ -248,18 +385,17 @@ function datagraph(id, tsv) {
                 .gravity(.015)
                 .size([width, height])
                 .on("tick", tick);
+            force
+                .nodes(graph.nodes)
+                .links(graph.links)
+                .start();
             update();
         });
     return this;
 }
 
 /* Main update function */
-
 function update() {
-    force
-        .nodes(graph.nodes)
-        .links(graph.links)
-        .start();
     // Add/update links
     var link = svg.selectAll('.link')
         .data(graph.links);
@@ -275,7 +411,7 @@ function update() {
                 return "url(#rarrow"+d.type+")";
             },
             "marker-start": function(d) {
-                if(d.flow == 2)
+                if(d.flow == FLOW_CONNECT)
                     return "url(#larrow"+d.type+")";
             }})
         .on("click", clicklink);
@@ -315,50 +451,148 @@ function update() {
 }
 
 /* Main timestep function */
-
 function tick() {
+    var node = svg.selectAll('.node');
+    node.attr({
+        transform: function(d) {
+            if(d.conf && this.getAttribute("cx")) {
+                d.x = parseFloat(this.getAttribute("cx"));
+                d.y = parseFloat(this.getAttribute("cy"));
+            }
+            return "translate(" + d.x + "," + d.y + ")"; },
+        class: function(d) {
+            var cl = "node";
+            if(d.fixed) cl += " fixed";
+            return cl;
+        }
+    });
+    
     var link = svg.selectAll('.link');
     link.attr("d", function(d) {
         var clink = correctLink(d, link_spread);
-        if(d.weight == 1 || d.flow == 2) 
+        if(d.weight == 1 || d.flow == FLOW_CONNECT) 
             return pathline(clink);
         else
             return patharc(clink);
-    })
-        .style("opacity", function(d) {
+    }).style("opacity", function(d) {
             var clink = correctLink(d, link_spread),
                 invmindist = 0.03; // 3/link_dist
-            // if(d.tools=="cgDNA")
-            //     $("#debug").text(
-            //         clink.x0.toFixed(1)+","+clink.y0.toFixed(1)+","+
-            //         clink.x1.toFixed(1)+","+clink.y1.toFixed(1)+","+
-            //         clink.dx.toFixed(1)+","+clink.dy.toFixed(1)+","+
-            //         clink.dr.toFixed(1)+","+(invmindist*clink.dr).toFixed(1));
-            return Math.min(1.0, invmindist*clink.dr);
-        });
-    
-    var node = svg.selectAll('.node');
-    node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+        /* Some useful debugging:
+           if(d.tools=="cgDNA")
+             $("#debug").text(
+             clink.x0.toFixed(1)+","+clink.y0.toFixed(1)+","+
+             clink.x1.toFixed(1)+","+clink.y1.toFixed(1)+","+
+             clink.dx.toFixed(1)+","+clink.dy.toFixed(1)+","+
+             clink.dr.toFixed(1)+","+(invmindist*clink.dr).toFixed(1));
+             return Math.min(1.0, invmindist*clink.dr);
+        */
+        });    
 }
 
+function refresh() {
+    /* Let the layout adapt to changes */
+    force.alpha(1.0);
+}
 
 /* Callback functions */
-
 function clicknode(d) {
-    console.log(d);
     if (d3.event.defaultPrevented) return; // ignore drag
-    $("#selector-hp").html(textifynode(d));
+    $("#metadata").html(textifynode(d));
     if (d3.event.shiftKey) {
-        d.px = width/2;
-        d.py = height/2;
-        var node = svg.selectAll('.node');
-        node.each(function(d) {d.fixed = false;});
-        d.fixed = true;
-        update();
+        d.fixed = !d.fixed;
     }
+    refresh();
 }
 
 function clicklink(d) {
-    console.log(d);
-    $("#selector-hp").html(textifylink(d));
+    $("#metadata").html(textifylink(d));
+}
+
+/* Location functions */
+function graphApply(locations, scale) {
+    var node = svg.selectAll('.node');
+    node.attr({
+        cx: function(d){d.fixed=true; d.conf=true; return d.x;},
+        cy: function(d){return d.y;}
+    });
+    node.transition().duration(1000).attr({
+        cx: function(d) {
+            var loc = locations[d.name];
+            if(!loc) {
+                console.log(d.name+" not found in locations!");
+                return 0;
+            }
+            return scale*loc[0]+width/2;
+        },
+        cy: function(d) {
+            var loc = locations[d.name];
+            if(!loc) {
+                console.log(d.name+" not found in locations!");
+                return 0;
+            }
+            return 0.9*height-scale*loc[1];
+        }})
+        .each("end", function(d) {d.px=d.x; d.py=d.y; d.conf=false;});
+    refresh();
+}
+
+function pentagon() {
+    var a=0.32,
+        b=0.53,
+        c=0.62,
+        d=0.9,
+        scale=400;
+    var locations = {
+        "MNase": 	 [0,  d],
+        "RNA-seq": 	 [-a, c*0.7],
+        "Histone marks": [0,  c*0.75],
+        "ChIP-seq":		 [b,  c],
+        "Hi-C":		 [a,  a], 
+        "Models (bp)": [-b, c],
+        "3D chromatin":	 [a,  0],
+        "Models (kbp)":[-a, 0],
+        "DNA MD":	 [-a, d],
+        "FISH":		 [-a*0.6, c*0.4]};
+    graphApply(locations, scale);
+}
+
+function hexagon() {
+    var a=0.5,
+        b=1.0,
+        c=1.0,
+        d=1.4*c,
+        scale=250;
+    var locations = {
+	"MNase":	 [a,  d],
+	"RNA-seq":	 [-a, c*0.7],
+	"Histone marks": [0,  c*0.75],
+	"ChIP-seq":		 [b,  c],
+	"Hi-C":		 [a,  a*1.1], 
+	"Models (bp)": [-b, c],
+	"3D chromatin":	 [a,  0],
+	"Models (kbp)":[-a, 0],
+	"DNA MD":	 [-a, d],
+	"FISH":		 [-a*0.7, c*0.45]};
+    graphApply(locations, scale);
+}
+
+function circle(random = false) {
+    var scale=200,
+        locations = {},
+        th;
+    graph.nodelist.forEach(function(d,i,A) {
+        if(random)
+            th = Math.random() * 2 * PI;
+        else
+            th = i/A.length * 2 * PI;
+        locations[d] = [
+            Math.cos(th),
+            Math.sin(th)+1];
+    });
+    graphApply(locations, scale);
+}
+
+function release() {
+    graph.nodes.forEach(function(d) {d.fixed=false;});
+    refresh();
 }

@@ -5,9 +5,9 @@
     <meta name="description" content="" />
     <meta name="author" content="The MuG project" />
     <link rel="icon" href="favicon.ico" />
-    
+
     <title>The MuG Information Network</title>
-    
+
     <script type="text/javascript" src="SpryAssets/SpryMenuBar.js"></script>
     <script src="js/vendor/d3.v3.js"></script>
     <script src="js/vendor/jquery.min.js"></script>
@@ -15,15 +15,16 @@
     <link href="css/MuG.css" rel="stylesheet" type="text/css" media="all" />
     <link href="SpryAssets/SpryMenuBarHorizontal.css" rel="stylesheet" type="text/css" media="all" />
     <link href="css/mugin.css" rel="stylesheet" />
+    <link href="font-awesome/css/font-awesome.min.css" rel="stylesheet">
   </head>
-  
+
   <body>
     <div id="container">
-      
+
       <!-- HEADER: MuG logo -->
       <div id="header">
 	<p align="left"><img src="images/topWeb.png" alt="MuG" width="900" height="124" /></p>
-	<p align="center"><strong>The MuG Information Network</strong>. </p>
+	<p align="center"><strong>The MuG Information Network</strong> </p>
       </div>
       <div id="menu">
 	<ul id="MenuBar1" class="MenuBarHorizontal">
@@ -32,41 +33,29 @@
 	</ul>
       </div>
       <div style='clear:both'></div>
-      
+
       <!-- Main content -->
       <div id="content">
-	
+
 	<div id="intro">
 	</div>
-	
+
 	<div id="data">
 	  <!-- <h3></h3> -->
 	  <div id="graph">
 	    <script type="text/javascript">
-              var mat = datagraph("#graph", "mugdata.tsv");
+              var mat = datagraph("#graph", "mugdata.csv");
             </script>
-	  </div>
-	  <div id="selector-hp" class="selector">
+	    <div id="metadata" class="metadata">
+	    </div>
 	  </div>
 	  <div id="debug"></div>
 	</div>	
       </div>
 
       <div id="footnotes">
-	<h3>References and Footnotes</h3>
-	<ol class="publist">
-	  <li>...</li>
-	  <li>...</li>
-	  <li>...</li>
-	  <li>...</li>
-	</ol>
-	<dl class="footnotes">
-	  <!-- <dd><sup id="fn1">1. Missing cells in the matrix refer to -->
-	  <!--     tetranucleotides whose opposite strand read is present elsewhere in the matrix; e.g. CATA is missing, but TATG is present; see also Pasi <i>et al.</i>, 2015. <a href="#ref1" title="Back.">[Back]</a></sup></dd> -->
-	  <!-- <dd><sup id="fn2">2. Colormaps "RdBu 9", "BrBG 10", "Spectral 11" courtesy of <a href="http://colorbrewer2.org">Color Brewer 2</a>. <a href="#ref2" title="Back.">[Back]</a></sup></dd> -->
-	</dl>
       </div>
-      
+
       <!-- FOOTER: MuG info -->
       <div id="footer">
 	<table width="100%" cellpadding="4">
@@ -76,7 +65,8 @@
 	  </tr>
 	</table>
       </div>
-	
+
     </div>
   </body>
 </html>
+
