@@ -15,6 +15,7 @@
  *  1. directional links DONE v0.2
  *  2. double links      DONE v0.2
  *  3. improved metadata DONE v0.3
+ *  4a. JSON input/output
  *  4. editable metadata
  *  5. graph bidimensional sorting
  *  6. multiple entries per link
@@ -39,9 +40,9 @@ var nodeinfo = {
 var PI = 3.1415;
 
 /* Types:
- *  1. available tools: done
- *  2. demonstrated to be relevant, but no available tools: todo
- *  3. potentially relevant: maybe
+ *  0. available tools: done
+ *  1. demonstrated to be relevant, but no available tools: todo
+ *  2. potentially relevant: maybe
  */  
 var NTYPES = 3,
     TYPE_DONE = 0,
@@ -51,9 +52,9 @@ var NTYPES = 3,
     TYPE_DESCRIPTION=["Tools available", "Relevant", "Potential"];
 
 var NFLOWS = 2,
-    FLOW_INFORM = 0,
-    FLOW_CONNECT = 1,
-    FLOW_DESCRIPTION = ["Inform", "Connect"];
+    FLOW_CONNECT = 0,
+    FLOW_INFORM  = 1,
+    FLOW_DESCRIPTION = ["Connect", "Inform"];
 
 /* Configuration */
 var width = 600,
@@ -83,23 +84,22 @@ function capitalize(string) {
 
 
 /* Other utility functions */
-function addnode(graph, nodename) {
+function addnode(node) {
     /* XXX move to the graph prototype.
      * Add a node to the graph 
      */
 
-    if(graph.nodelist.indexOf(nodename) >= 0)
-        return graph.nodelist.indexOf(nodename);
+    if(graph.nodelist.indexOf(node.name) >= 0)
+        return graph.nodelist.indexOf(node.name);
 
     var th = Math.random() * 2 * PI;
 
-    var ret = graph.nodelist.push(nodename);
-    graph.nodes.push({
-        "x": (1+Math.sin(th))*width/2, 
-        "y": (1+Math.cos(th))*width/2,
-        "rx": Math.max(30, nodename.length*4),
-        "ry": 30,
-        "name": nodename});
+    var ret = graph.nodelist.push(node.name);
+    node.x= (1+Math.sin(th))*width/2;
+    node.y= (1+Math.cos(th))*width/2;
+    node.rx= Math.max(30, node.name.length*4);
+    node.ry= 30;
+    graph.nodes.push(node);
     return ret-1;
 }
 
@@ -149,9 +149,9 @@ function textifynode(d) {
     return `
         <table>
         <tr><th colspan="2">Node: ` + d.name + `</th></tr>
-        <tr><td colspan="2">` + nodeinfo[d.name] + `</td></tr>
-        </table>        
-        ` + metadata_toolbox("node");
+        <tr><td colspan="2">` + d.description + `</td></tr>
+        <tr><td>Weight:</td><td>` + d.weight + `</td></tr>
+        </table>`;
 }
 
 function textifylink(d) {
@@ -172,20 +172,36 @@ function textifylink(d) {
         linkstr += "<tr><td>Reference:</td><td>" + refstr + "</td></tr>";
     }
     if(d.tools != "")
-        linkstr += "<tr><td>Available tools:</td><td>" + d.tools + "</td></tr>";
+        linkstr += "<tr><td>Tools:</td><td>" + d.tools + "</td></tr>";
+    if(d.notes != "")
+        linkstr += "<tr><td>Notes:</td><td>" + d.notes + "</td></tr>";
     linkstr += "</table>";
-    return linkstr + metadata_toolbox("link");
+    return linkstr;
 }
 
-function metadata_toolbox(type) {
-    var mtstr = `
-        <div class="metadata_toolbox">
-        <a href="#"><span class="item edit" title="Edit `+type+`"><i class="fa fa-pencil-square-o fa-3x"></i></span></a>
-        <a href="#"><span class="item delete" title="Delete `+type+`"><i class="fa fa-times fa-3x"></i></span></a>`;
-    if(type=="node")
-        mtstr += '<a href="#"><span class="item link"><i class="fa fa-link fa-3x" title="Add link"></i></span></a>';
-    return mtstr + "</div>";
-;
+function metadata(d, type) {
+    $(".item").hide();
+    if(type == "node") {
+        $("#metadata").html(textifynode(d));
+        $(".add").show();
+        $(".edit").show();
+        $(".delete").show();
+        $(".add").prop("title","Add Node");
+        $(".edit").prop("title","Edit Node");
+        $(".delete").prop("title","Delete Node");
+        $(".link").show();
+    }else if(type == "link") {
+        $("#metadata").html(textifylink(d));
+        $(".add").show();
+        $(".edit").show();
+        $(".delete").show();
+        $(".add").prop("title","Add Link");
+        $(".edit").prop("title","Edit Link");
+        $(".delete").prop("title","Delete Link");
+    }
+    // Adjust box height
+    $("#metadata_box").height(
+        $("#metadata").outerHeight() + $("#metadata_toolbox").outerHeight());
 }
 
 function make_toolbox() {
@@ -287,7 +303,7 @@ function make_markers() {
 	.attr({
 	    "id":"larrow"+t,
 	    "viewBox":"0 -5 10 10",
-	    "refX":0,
+	    "refX":2,
 	    "refY":0,
 	    "markerWidth":mkw,
 	    "markerHeight":mkw,
@@ -324,8 +340,8 @@ function datagraph(id, csv) {
         csv,
         function(d) {
             // Add nodes
-            var src = addnode(graph, d.data1),
-                trg = addnode(graph, d.data2);
+            var src = addnode({name: d.data1, description: nodeinfo[d.data1]}),
+                trg = addnode({name: d.data2, description: nodeinfo[d.data2]});
             
             // Check if link exists
             var linkid = Math.min(src,trg)*1e10+Math.max(src,trg),
@@ -341,36 +357,23 @@ function datagraph(id, csv) {
                 });
             }
             
-            // Compute derived variables
-            var flow= FLOW_INFORM;
-            if(d.flow == "<-") {
+            // Turn around when flow is negative
+            if(d.flow == -1) {
                 var tmp = src;
                 src=trg;
                 trg=tmp;
-            }else if(d.flow == "<->") {
-                flow = FLOW_CONNECT;
+                d.flow = 1;
             }
-            
-            /* Types:
-             *  1. available tools: done
-             *  2. demonstrated to be relevant, but no available tools: todo
-             *  3. potentially relevant: maybe
-             */  
-            var type = TYPE_TODO;
-            if(d.tools != "")
-                type = TYPE_DONE;            
-            else if(d.reference == "")
-                type = TYPE_MAYBE;
             
             graph.links.push({
                 "source": src,
                 "target": trg,
-                "flow": flow,
+                "flow": d.flow,
                 "description": d.description,
                 "reference": d.reference,
                 "notes": d.notes,
                 "tools": d.tools,
-                "type": type,
+                "type": d.type,
                 "links": d.links,
                 "weight": weight
             });
@@ -497,7 +500,7 @@ function refresh() {
 /* Callback functions */
 function clicknode(d) {
     if (d3.event.defaultPrevented) return; // ignore drag
-    $("#metadata").html(textifynode(d));
+    metadata(d, "node");
     if (d3.event.shiftKey) {
         d.fixed = !d.fixed;
     }
@@ -505,7 +508,7 @@ function clicknode(d) {
 }
 
 function clicklink(d) {
-    $("#metadata").html(textifylink(d));
+    metadata(d, "link");
 }
 
 /* Location functions */
@@ -520,7 +523,7 @@ function graphApply(locations, scale) {
             var loc = locations[d.name];
             if(!loc) {
                 console.log(d.name+" not found in locations!");
-                return 0;
+                return width/2;
             }
             return scale*loc[0]+width/2;
         },
@@ -528,7 +531,7 @@ function graphApply(locations, scale) {
             var loc = locations[d.name];
             if(!loc) {
                 console.log(d.name+" not found in locations!");
-                return 0;
+                return height/2;
             }
             return 0.9*height-scale*loc[1];
         }})
@@ -580,12 +583,12 @@ function circle(random = false) {
     var scale=200,
         locations = {},
         th;
-    graph.nodelist.forEach(function(d,i,A) {
+    graph.nodes.forEach(function(d,i,A) {
         if(random)
             th = Math.random() * 2 * PI;
         else
             th = i/A.length * 2 * PI;
-        locations[d] = [
+        locations[d.name] = [
             Math.cos(th),
             Math.sin(th)+1];
     });

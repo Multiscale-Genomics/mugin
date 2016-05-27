@@ -19,7 +19,7 @@ dl.footnotes dd {
 }
 
 /* metadata */
-#metadata {
+#metadata_box {
     display: block;
     position: absolute;
     top: 10px;
@@ -32,6 +32,11 @@ dl.footnotes dd {
     overflow: hidden;
     z-index: 1000;
     background: rgba(250,250,250,0.5);
+}
+
+#metadata {
+    position: absolute;
+    width: 100%;
 }
 
 #metadata table {
@@ -61,18 +66,24 @@ th.todo {
 th.maybe {
 }
 
-.metadata_toolbox {
+#metadata_toolbox {
     position: absolute;
     bottom: 0px;
     width: 100%;
     border-top: 2px solid #777;
-    padding: 5px 2.5px 0 2.5px;
+    padding: 5px;
 }
-.metadata_toolbox .item {
-    color: #777;
+#metadata_toolbox .item {
     margin: 0 2.5px;
+    display: none;
 }
-
+#metadata_toolbox .item a {
+    color: #777;
+    font-size: 13px;
+}
+#metadata_toolbox .add {
+    display: inline-block;
+}
 
 /* SVG */
 .node {
