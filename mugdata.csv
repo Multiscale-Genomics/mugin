@@ -1,4 +1,4 @@
-data1,flow,data2,type,description,reference,links,tools,notes
+source,flow,target,type,description,reference,links,tools,notes
 MNase,0,RNA-seq,1,Relate nucleosome dynamics with gene expression,"Deniz et al., 26818620",www.ncbi.nlm.nih.gov/pubmed/26818620,,Through sequence
 MNase,0,Histone marks,1,Effect of H.marks on nucleosome arrangement at genes,"Rhee et al., 25480300",www.ncbi.nlm.nih.gov/pubmed/25480300,,Through sequence
 MNase,1,Hi-C,1,Formalise data to inform modeling,,,,Through sequence

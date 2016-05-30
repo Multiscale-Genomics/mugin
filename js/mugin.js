@@ -11,11 +11,12 @@
  * v0.1 160518
  * v0.2 160520
  * v0.3 160525
+ * v0.4 160528
  * TODO: 
  *  1. directional links DONE v0.2
  *  2. double links      DONE v0.2
  *  3. improved metadata DONE v0.3
- *  4a. JSON input/output
+ *  4a. JSON input/output DONE v0.4
  *  4. editable metadata
  *  5. graph bidimensional sorting
  *  6. multiple entries per link
@@ -83,12 +84,17 @@ function capitalize(string) {
 }
 
 
-/* Other utility functions */
-function addnode(node) {
-    /* XXX move to the graph prototype.
-     * Add a node to the graph 
-     */
+/* Graph functions
+ * XXX move to the graph prototype.
+ */
 
+function addnode(node) {
+    /* Add a node to the graph.
+     *
+     * node: {name, description}
+     */
+    if(node.name == undefined)
+        return -1;
     if(graph.nodelist.indexOf(node.name) >= 0)
         return graph.nodelist.indexOf(node.name);
 
@@ -102,6 +108,81 @@ function addnode(node) {
     graph.nodes.push(node);
     return ret-1;
 }
+
+function addlink(link) {
+    /* Add a link to the graph.
+     *
+     * link: {source, target, flow, description,
+     *        reference, notes, tools, type, links, weight}
+     */
+    // Add nodes
+    if(link.source == undefined)
+        return -1;
+    var src = addnode({name: link.source, description: nodeinfo[link.source]}),
+        trg = addnode({name: link.target, description: nodeinfo[link.target]});
+    
+    // Check if link exists
+    var linkid = Math.min(src,trg)*1e10+Math.max(src,trg),
+        linkis = graph.linklist.findAll(linkid),
+        weight = 1;
+    graph.linklist.push(linkid);
+    if(linkis.length > 0) {
+        weight = graph.links[linkis[0]].weight + 1;
+        if(weight > 3) // Max 3 links
+            return -1; // skip
+        linkis.forEach(function(l) {
+            graph.links[l].weight = weight;
+        });
+    }
+    
+    // Turn around when flow is negative
+    if(link.flow == -1) {
+        var tmp = src;
+        src=trg;
+        trg=tmp;
+        link.flow = 1;
+    }
+
+    // Parse references if text
+    if(typeof link.reference == "string") {
+        var refs = link.reference.split(";");
+        var links = link.links.split(";");
+        link.reference = 
+            refs.map(function(ref, i) {
+                return {link: links[i], text: ref};
+            });
+        link.links = links.slice(refs.length);
+    }
+    
+    graph.links.push({
+        "source": src,
+        "target": trg,
+        "flow": link.flow,
+        "description": link.description,
+        "reference": link.reference,
+        "notes": link.notes,
+        "tools": link.tools,
+        "type": link.type,
+        "links": link.links,
+        "weight": weight
+    });
+}
+
+function tojson() {
+    var skippers = "x y rx ry index weight px py fixed conf nodelist linklist".split(" ");
+    return JSON.stringify(
+        graph,
+        function(key, value) {
+            if(skippers.indexOf(key) >= 0)
+                return undefined;
+            // transform objects to names
+            if(key == "source" || key == "target")
+                return value.name;
+            return value
+        }, true);
+}
+
+/* Other utility functions */
 
 function correctLink(d, dth) {
     /* 
@@ -144,6 +225,9 @@ function patharc(link) {
         link.x1 + "," + link.y1;
 }
 
+
+/* Metadata */
+
 function textifynode(d) {
     // Return text description of node
     return `
@@ -163,12 +247,10 @@ function textifylink(d) {
         <tr><td>Flow:</td><td>` + FLOW_DESCRIPTION[d.flow] + `</td></tr>
         <tr><td>Type:</td><td>` + TYPE_DESCRIPTION[d.type] + `</td></tr>
         `;
-    if(d.reference != "" && d.reference != "Missing") {
-        var references = d.reference.split(";");
-        var links = d.links.split(";");
-        var refstr = references.map( function(s,i){
-            return "<a href='http://"+links[i]+"'>"+s+"</a>";
-        }).join("<br/>")
+    if(d.reference.length > 0) {
+        var refstr = d.reference.map(function(ref, i) {
+            return "<a href='http://"+ref.link+"'>"+ref.text+"</a>"
+        }).join("<br/>");
         linkstr += "<tr><td>Reference:</td><td>" + refstr + "</td></tr>";
     }
     if(d.tools != "")
@@ -203,6 +285,9 @@ function metadata(d, type) {
     $("#metadata_box").height(
         $("#metadata").outerHeight() + $("#metadata_toolbox").outerHeight());
 }
+
+
+/* Toolbox */
 
 function make_toolbox() {
     var TOOL_SIZE = 40,
@@ -320,7 +405,7 @@ function make_markers() {
 //     to wrap all this into an object with an
 //     assigned id, tsv; then the _this pattern
 //     can be used for callbacks.
-function datagraph(id, csv) {
+function datagraph(id, filein, type="json") {
     svg = d3.select(id).append("svg")
         .attr({
             width: 900,
@@ -335,68 +420,53 @@ function datagraph(id, csv) {
     graph.linklist = []; // temporary structure to count links
     graph.nodes = [];
     graph.links = [];
-        
-    d3.csv(
-        csv,
-        function(d) {
-            // Add nodes
-            var src = addnode({name: d.data1, description: nodeinfo[d.data1]}),
-                trg = addnode({name: d.data2, description: nodeinfo[d.data2]});
-            
-            // Check if link exists
-            var linkid = Math.min(src,trg)*1e10+Math.max(src,trg),
-                linkis = graph.linklist.findAll(linkid),
-                weight = 1;
-            graph.linklist.push(linkid);
-            if(linkis.length > 0) {
-                weight = graph.links[linkis[0]].weight + 1;
-                if(weight > 3) // Max 3 links
-                    return -1; // skip
-                linkis.forEach(function(l) {
-                    graph.links[l].weight = weight;
+
+    if(type=="csv") 
+        d3.csv(filein, addlink,
+               function(error, data) {
+                   if(error)
+                       errorHandle(error);
+                   else
+                       buildUI();
+               });
+    else if(type=="json")
+        d3.json(filein,
+                function(error, data) {
+                    console.log(data);
+                    if(error)
+                        errorHandle(error);
+                    else {
+                        data.nodes.forEach(addnode);
+                        data.links.forEach(addlink);
+                        buildUI();
+                    }
                 });
-            }
-            
-            // Turn around when flow is negative
-            if(d.flow == -1) {
-                var tmp = src;
-                src=trg;
-                trg=tmp;
-                d.flow = 1;
-            }
-            
-            graph.links.push({
-                "source": src,
-                "target": trg,
-                "flow": d.flow,
-                "description": d.description,
-                "reference": d.reference,
-                "notes": d.notes,
-                "tools": d.tools,
-                "type": d.type,
-                "links": d.links,
-                "weight": weight
-            });
-        },
-        // Build the UI
-        function(error, data) {
-            // Create layout
-            force = d3.layout.force()
-                .linkDistance(link_dist)
-                .linkStrength(.02)
-                .charge(-120)
-                .gravity(.015)
-                .size([width, height])
-                .on("tick", tick);
-            force
-                .nodes(graph.nodes)
-                .links(graph.links)
-                .start();
-            update();
-        });
     return this;
 }
 
+function errorHandle(error) {
+    console.log(error);
+}
+
+/* Main build UI function */
+// Build the UI
+function buildUI() {
+    // Create layout
+    force = d3.layout.force()
+        .linkDistance(link_dist)
+        .linkStrength(.02)
+        .charge(-120)
+        .gravity(.015)
+        .size([width, height])
+        .on("tick", tick);
+    force
+        .nodes(graph.nodes)
+        .links(graph.links)
+        .start();
+    update();
+};
+
+    
 /* Main update function */
 function update() {
     // Add/update links
@@ -549,11 +619,11 @@ function pentagon() {
         "MNase": 	 [0,  d],
         "RNA-seq": 	 [-a, c*0.7],
         "Histone marks": [0,  c*0.75],
-        "ChIP-seq":		 [b,  c],
+        "ChIP-seq":	 [b,  c],
         "Hi-C":		 [a,  a], 
-        "Models (bp)": [-b, c],
+        "Models (bp)": 	 [-b, c],
         "3D chromatin":	 [a,  0],
-        "Models (kbp)":[-a, 0],
+        "Models (kbp)":	 [-a, 0],
         "DNA MD":	 [-a, d],
         "FISH":		 [-a*0.6, c*0.4]};
     graphApply(locations, scale);
@@ -569,11 +639,11 @@ function hexagon() {
 	"MNase":	 [a,  d],
 	"RNA-seq":	 [-a, c*0.7],
 	"Histone marks": [0,  c*0.75],
-	"ChIP-seq":		 [b,  c],
+	"ChIP-seq":	 [b,  c],
 	"Hi-C":		 [a,  a*1.1], 
-	"Models (bp)": [-b, c],
+	"Models (bp)": 	 [-b, c],
 	"3D chromatin":	 [a,  0],
-	"Models (kbp)":[-a, 0],
+	"Models (kbp)":	 [-a, 0],
 	"DNA MD":	 [-a, d],
 	"FISH":		 [-a*0.7, c*0.45]};
     graphApply(locations, scale);
