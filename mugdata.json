@@ -36,6 +36,6 @@
   {"source":"Histone marks","target":"Models (kbp)","flow":"1","description":"Parameterise interactions based on chromatin type","reference":[{"link":"www.ncbi.nlm.nih.gov/pubmed/25092923","text":"Jost et al., 25092923"}],"notes":"","tools":"","type":"1","links":[]},
   {"source":"Models (bp)","target":"Models (kbp)","flow":"1","description":"Parameterisation of interactions & flexibility","reference":[{"link":"","text":""}],"notes":"","tools":"","type":"2","links":[]},
   {"source":"Models (kbp)","target":"Models (bp)","flow":1,"description":"Back-mapping coordinates","reference":[{"link":"","text":""}],"notes":"","tools":"","type":"2","links":[]},
-  {"source":"ChIP-seq","target":"DNA MD","flow":1,"description":"Consensus sequence information","reference":[{"link":"jaspar.genereg.net","text":"http://jaspar.genereg.net/"}],"notes":"","tools":"Various: http://omictools.com/motif-discovery-category","type":"0","links":[]},
+  {"source":"ChIP-seq","target":"DNA MD","flow":1,"description":"Consensus sequence information","reference":[{"link":"","text":""}],"notes":"","tools":"Various","type":"0","links":["http://jaspar.genereg.net/", "http://omictools.com/motif-discovery-category"]},
   {"source":"Histone marks","target":"DNA MD","flow":1,"description":"Effect of H.marks on chromatin folding","reference":[{"link":"www.ncbi.nlm.nih.gov/pubmed/26192632","text":"Colleparo-Guevara et al., 26192632"}],"notes":"","tools":"","type":"1","links":[]}
  ]}
