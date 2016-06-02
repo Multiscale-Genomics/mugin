@@ -43,14 +43,10 @@
 	<div id="data">
 	  <!-- <h3></h3> -->
 	  <div id="graph">
-	    <script type="text/javascript">
-              //var mat = datagraph("#graph", "mugdata.csv", "csv");
-              var mat = datagraph("#graph", "mugdata.json");
-            </script>
-	    <div id="metadata_box" class="floatbox">
+	    <div id="graph_info" class="floatbox">
               <div id="metadata">
 	      </div>
-              <div id="metadata_toolbox">
+              <div id="toolbox">
 		<span class="item add" title="Add Node"><a><i class="fa fa-plus fa-2x"></i></a></span>
 		<span class="item edit" title="Edit"><a><i class="fa fa-pencil fa-2x"></i></a></span>
 		<span class="item delete" title="Delete"><a><i class="fa fa-times fa-2x"></i></a></span>
@@ -59,6 +55,14 @@
 		<span class="item submit" title="Save"><a><i class="fa fa-floppy-o fa-2x"></i></a></span>
               </div>
 	    </div>
+	    <script type="text/javascript">
+              //var mat = new GraphLayout("#graph", "mugdata.csv", "csv");
+              var g = new GraphLayout("#graph", "mugdata.json");
+              var vg = new VGraph(g.graph, "#graph_info");
+              vg.register_callback(function(){g.update();});
+              g.on("node_click", function(node){vg.show(node, "node");});
+              g.on("link_click", function(link){vg.show(link, "link");});
+            </script>
 	  </div>
 	  <div id="debug"></div>
 	</div>	

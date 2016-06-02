@@ -19,9 +19,10 @@
  *  3. improved metadata DONE v0.3
  *  4. JSON input/output DONE v0.4
  *  5. editable metadata DONE v0.5
+ *  5b. commit json to php
  *  6. graph bidimensional sorting
  *  7. multiple entries per link
- *
+ *  ...
  */
 
 /* Constants */
@@ -61,9 +62,6 @@ var LOG_LEVEL = 0,
 var TOOL_SIZE = 40,
     TOOLmv = 10,
     TOOLmh = 10;
-var NTOOL = 3,
-    TOOL_FUN = [circle, hexagon, release],
-    TOOL_ICON = ["images/circle.svg", "images/hexagon.svg", "images/release.svg"];
 
 /* Legend */
 var LEGEND_WID = 20,
@@ -75,12 +73,7 @@ var LEGEND_WID = 20,
 /* Configuration */
 var width = 600,
     height = 500,
-    transitionDuration = 1000, // ms
-    link_dist = Math.min(width,height)/4.0,
-    link_spread = 0.3; // radians
-
-/* Globals */
-var svg, graph = {}, force;
+    transitionDuration = 1000; // ms
 
 /* General utility functions */
 Array.prototype.findAll = function(searchElement) {
@@ -103,17 +96,6 @@ Array.prototype.clean = function(deleteValue) {
     return this;
 };
 
-function updateobject(obj, obj2) {
-    // XXX TODO: move to the Node/Link prototype
-    for (var prop in obj2) {
-        var val = obj2[prop];
-        if (typeof val == "object") // this also applies to arrays or null!
-            updateobject(obj[prop], val);
-        else
-            obj[prop] = val;
-    }
-}
-
 function capitalize(string) {
     return string.substr(0, 1).toUpperCase() + string.substr(1);
 }
@@ -133,61 +115,95 @@ function errorHandle(error) {
     return -1;
 }
 
-
-
-/* Graph functions
- * XXX move to the graph prototype.
- */
-
-function addnode(node) {
-    /* Add a node to the graph.
-     *
-     * node: {name, description}
+function updateobject(obj, obj2) {
+    /*
+     * Deep copy all contents of obj2 to obj, overwriting
+     * when required.
      */
-    if(node.name == undefined)
-        return -1;
-    var nodelist = graph.nodes.map(function(d){return d.name;});
-    if(nodelist.indexOf(node.name) >= 0)
-        return nodelist.indexOf(node.name);
-
-    var th = Math.random() * 2 * PI;
-    node.x= (1+Math.sin(th))*width/2;
-    node.y= (1+Math.cos(th))*width/2;
-    node.rx= Math.max(30, node.name.length*4);
-    node.ry= 30;
-    return graph.nodes.push(node) - 1;
+    // XXX TODO: move to the Node/Link prototype
+    for (var prop in obj2) {
+        var val = obj2[prop];
+        if (typeof val == "object") { // this also applies to arrays or null!
+            if(! (prop in obj))
+                obj[prop] = null
+            updateobject(obj[prop], val);
+        } else
+            obj[prop] = val;
+    }
 }
 
-function get_nodeids(link) {
+/* Node, Link, Graph
+ */
+var CopyObject = function(object) { // copy constructor
+    $.extend(this, object);
+}
+var Node = function(object) {
+    CopyObject.call(this, object);
+}
+Node.prototype = Object.create(CopyObject.prototype);
+Node.prototype.constructor = Node;
+
+Node.prototype.update = function(node2) {
+    /*
+     * Update node with all fields in =node2=,
+     * overwriting when required.
+     */
+    $.extend(this, node2);
+    message(LOG_DEBUG, "Updated node: ", this);
+    return 0;
+}
+
+var Link = function(object) {
+    CopyObject.call(this, object);
+}
+Link.prototype = Object.create(CopyObject.prototype);
+Link.prototype.constructor = Link;
+
+Link.prototype.updatelink = function(link2) {
+    /*
+     * Update =link= with all fields in =link2=,
+     * overwriting when required.
+     */
+    $.extend(this, link2);
+    message(LOG_DEBUG, "Updated link: ", this);
+    return 0;
+}
+
+Link.prototype.get_nodeids = function() {
     /*
      * Get ids of a link's source and target nodes
      */
-    var src = typeof link.source == "object" ? link.source.index : link.source,
-        trg = typeof link.target == "object" ? link.target.index : link.target;
+    var src = typeof this.source == "object" ? this.source.index : this.source,
+        trg = typeof this.target == "object" ? this.target.index : this.target;
     return [src, trg];
 }
 
-function get_undirected_linkid(link) {
+Link.prototype.get_undirected_linkid = function() {
     /*
      * Get an undirected unique number for links.
      */
-    var ids = get_nodeids(link),
+    var ids = this.get_nodeids(),
         src = ids[0],
         trg = ids[1];
     return Math.min(src,trg)*1e10+Math.max(src,trg);
 }
 
-function get_directed_linkid(link) {
+Link.prototype.get_directed_linkid = function() {
     /*
      * Get a directed unique number for links.
      */
-    var ids = get_nodeids(link),
+    var ids = this.get_nodeids(),
         src = ids[0],
         trg = ids[1];
     return src*1e10+trg;
 }
 
-function calculate_weights(link, del=false) {
+var Graph = function() {
+    this.nodes = [];
+    this.links = [];
+}
+
+Graph.prototype.calculate_weights = function(link, del=false) {
     /*
      * Recalculate the weights of all links between the
      * same edges as =link=, considering that =link= has
@@ -196,12 +212,13 @@ function calculate_weights(link, del=false) {
      * source, target and flow).
      * Returns the link's weight, or -1 upon failure.
      */
-    var linklist = graph.links.map(get_undirected_linkid),
-        ulinkid = get_undirected_linkid(link),
-        dlinkid = get_directed_linkid(link),
+    var self = this;
+    var linklist = this.links.map(function(link){return link.get_undirected_linkid();}),
+        ulinkid = link.get_undirected_linkid(),
+        dlinkid = link.get_directed_linkid(),
         ulinkis = linklist.findAll(ulinkid),
         dlinkis = ulinkis.map(function(i){ // search within undirected links
-            return get_directed_linkid(graph.links[i])
+            return self.links[i].get_directed_linkid();
         }).findAll(dlinkid)
         .map(function(i){return ulinkis[i];});
         weight = 1,
@@ -209,36 +226,64 @@ function calculate_weights(link, del=false) {
 
     if(!del &&
        dlinkis.length > 0 &&
-       graph.links[dlinkis[0]].flow == link.flow)
+       this.links[dlinkis[0]].flow == link.flow)
         return -1; // skip duplicate
 
     if(ulinkis.length > 0) {
         // Assume weights are up to date
-        weight = graph.links[ulinkis[0]].weight + delta_weight;
+        weight = this.links[ulinkis[0]].weight + delta_weight;
 
         // Update all weights
         ulinkis.forEach(function(l) {
-            graph.links[l].weight = weight;
+            self.links[l].weight = weight;
         });
     }
     return weight;
 }
 
-function addlink(link) {
+Graph.prototype.addnode = function(node) {
+    /* Add a node to the graph.
+     *
+     * node: {name, description}
+     */
+    if(node.name == undefined)
+        return -1;
+    var nodelist = this.nodes.map(function(d){return d.name;});
+    if(nodelist.indexOf(node.name) >= 0)
+        return nodelist.indexOf(node.name);
+
+    var th = Math.random() * 2 * PI;
+    node.x= (1+Math.sin(th))*width/2;
+    node.y= (1+Math.cos(th))*width/2;
+    node.rx= Math.max(30, node.name.length*4);
+    node.ry= 30;
+    return this.nodes.push(node) - 1;
+}
+
+Graph.prototype.addlink = function(link) {
     /*
      * Add a link to the graph.
      * Returns the index of the added link, or -1 upon failure.
+     * By convention, if link.source or link.target are
+     * strings, then a node with that name is added.
      *
      * link: {source, target, flow, description,
      *        reference, notes, tools, type, links, weight}
      */
+    link = new Link(link);
     // Add nodes
     if(link.source == undefined)
         return -1;
-    var src = addnode({name: link.source}),
-        trg = addnode({name: link.target});
 
-    message(LOG_DEBUG, "Adding link: ", link.source, link.target, src, trg);
+    var ids = link.get_nodeids(),
+        src = ids[0],
+        trg = ids[1];
+    if (typeof link.source == "string")
+        src = this.addnode({name: link.source});
+    if (typeof link.target == "string")
+        trg = this.addnode({name: link.target});
+
+    message(LOG_DEBUG, "Graph: addlink: ", link.source, link.target, src, trg);
 
     // Turn around when flow is negative
     if(link.flow == -1) {
@@ -252,7 +297,7 @@ function addlink(link) {
     link.target = trg;
 
     // Correct weights
-    var weight = calculate_weights(link);
+    var weight = this.calculate_weights(link);
     if(weight < 0) // skip
         return -1;
     link.weight = weight;
@@ -268,63 +313,38 @@ function addlink(link) {
         link.links = links.slice(refs.length);
     }
 
-    return graph.links.push(link) - 1;
+    return this.links.push(link) - 1;
 }
 
-function delnode(node)  {
+Graph.prototype.delnode = function(node)  {
     /*
      * Delete a node and all links to and from it
      */
-    var idx = graph.nodes.indexOf(node);
+    var self = this;
+    var idx = this.nodes.indexOf(node);
     if(idx < 0)
         return -1;
-    graph.nodes.splice(idx, 1);
+    this.nodes.splice(idx, 1);
     // remove links
-    graph.links.map(function(link, i) {
-        if(link.source == node || link.target == node)
-            return link;
-    }).clean(undefined)
-        .map(dellink);
+    this.links.filter(function(link, i) {
+        return link.source == node || link.target == node;
+    }).map(function(link){self.dellink(link);});
     return idx;
 }
 
-function dellink(link) {
+Graph.prototype.dellink = function(link) {
     /*
      * Delete a link
      */
-    var idx = graph.links.indexOf(link);
+    var idx = this.links.indexOf(link);
     if(idx < 0)
         return -1;
-    graph.links.splice(idx, 1);
-    calculate_weights(link, true);
+    this.links.splice(idx, 1);
+    this.calculate_weights(link, true);
     return idx;
 }
 
-function updatenode(node, node2) {
-    /*
-     * Update =node= with all fields in =node2=,
-     * overwriting when required.
-     *
-     * TODO: check that no fields are added?
-     */
-    updateobject(node, node2);
-    message(LOG_DEBUG, "Updated node: ", node);
-    return 0;
-}
-
-function updatelink(link, link2) {
-    /*
-     * Update =link= with all fields in =link2=,
-     * overwriting when required.
-     *
-     * TODO: check that no fields are added?
-     */
-    updateobject(link, link2);
-    message(LOG_DEBUG, "Updated link: ", link);
-    return 0;
-}
-
-function tojson() {
+Graph.prototype.tojson = function() {
     /*
      * Export the graph to json
      */
@@ -342,11 +362,41 @@ function tojson() {
 }
 
 
-/* HTMLGraph functions
- * XXX move to the HTMLGraph prototype.
+/* VGraph: view/edit graph info
+ * XXX extend Graph and implement VNode and VLink?
  */
 
-function _field(name, value, type, edit, derived=false, title=null, style="") {
+var VGraph = function(graph, id, callbacks = []){
+    /*
+     * Expects to find a div#metadata and div#toolbox within div#id;
+     *
+     *
+     *
+     */
+    this.graph = graph;
+    this.id = id;
+    this.tbox_id = this.id + " #toolbox";
+    this.data_id = this.id + " #metadata";
+    // List of functions to call upon update of graph data
+    this.update_callbacks = callbacks;
+    this.show();
+}
+
+VGraph.prototype.register_callback = function(callback) {
+    /*
+     * Register a function to be called when data is updated
+     */
+    this.update_callbacks.push(callback);
+}
+
+VGraph.prototype.update = function() {
+    /*
+     * Execute all callbacks
+     */
+    this.update_callbacks.forEach(function(fun){return fun();});
+}
+
+VGraph.prototype.field = function(name, value, type, edit, derived=false, title=null, style="") {
     /*
      * Generate an HTML representation of a field, either
      * to display, or to edit (when edit is true).
@@ -369,8 +419,9 @@ function _field(name, value, type, edit, derived=false, title=null, style="") {
      *     - reference: references of a link (see the graph class)
      *
      *
-     * TODO: use a common API for references and links, to match metadata_formdata().
+     * TODO: use a common API for references and links, to match formdata().
      */
+    var self = this;
     if(edit && derived)
         return "";
     if(!edit && value == "")
@@ -391,10 +442,10 @@ function _field(name, value, type, edit, derived=false, title=null, style="") {
 
         else if(type == "node")
             retstr += "<select name='"+name+"'>" +
-            graph.nodes.map(function(node, i) {
+            this.graph.nodes.map(function(node, i) {
                 var selected = "";
                 if(node.name == value) selected = "selected";
-                return "<option value='"+node.name+"' "+selected+">"+node.name+"</option>";
+                return "<option value="+i+" "+selected+">"+node.name+"</option>";
             }) + "</select>";
 
         else if(type == "linkflow")
@@ -418,7 +469,7 @@ function _field(name, value, type, edit, derived=false, title=null, style="") {
             if(value == "")
                 value = [];
             retstr += value.concat("").map(function(link, i) {
-                return _field(["",name,i].join("_"), link, "text", true, false, (i+1), "subfield");
+                return self.field(["",name,i].join("_"), link, "text", true, false, (i+1), "subfield");
             }).join("") + "</table>";
         }
 
@@ -427,8 +478,8 @@ function _field(name, value, type, edit, derived=false, title=null, style="") {
             if(value == "")
                 value = [];
             retstr += value.concat({}).map(function(ref, i) {
-                return _field(["",name,i,"text"].join("_"), ref.text, "text", true, false, (i+1)+".Text", "subfield") +
-                       _field(["",name,i,"link"].join("_"), ref.link, "text", true, false, (i+1)+".Link", "subfield");
+                return self.field(["",name,i,"text"].join("_"), ref.text, "text", true, false, (i+1)+".Text", "subfield") +
+                       self.field(["",name,i,"link"].join("_"), ref.link, "text", true, false, (i+1)+".Link", "subfield");
             }).join("") + "</table>";
         }
 
@@ -460,140 +511,63 @@ function _field(name, value, type, edit, derived=false, title=null, style="") {
     return retstr;
 }
 
-function nodehtml(d, edit=false) {
+VGraph.prototype.nodehtml = function(node, edit=false) {
     /*
      * Generate an HTML representation of a node
      */
     var nodestr = "<table>";
     if(edit) {
         var txt = "Edit node";
-        if(d.name == undefined)
+        if(node.name == undefined)
             txt = "New node";
         nodestr += "<tr><th colspan='2'>"+txt+":</th></tr>";
     }else{
-        nodestr += "<tr><th>Node:</th><th>"+d.name+"</th></tr>";
+        nodestr += "<tr><th>Node:</th><th>"+node.name+"</th></tr>";
     }
-    nodestr += _field("name", d.name, "text", edit) +
-        _field("description", d.description, "textarea", edit) +
-        _field("weight", d.weight, "text", edit, true) +
+    nodestr +=
+        this.field("name", node.name, "text", edit) +
+        this.field("description", node.description, "textarea", edit) +
+        this.field("weight", node.weight, "text", edit, true) +
         "</table>";
     return nodestr;
 }
 
-function linkhtml(d, edit=false) {
+VGraph.prototype.linkhtml = function(link, edit=false) {
     /*
      * Generate an HTML representation of a link
      */
     var linkstr = "<table>";
     if(edit) {
         var txt = "Edit link";
-        if(d.target == undefined)
+        if(link.target == undefined)
             txt = "New link";
         linkstr += "<tr><th>"+txt+"</th><th></th></tr>" +
-            _field("source", d.source && d.source.name, "node", true) +
-            _field("target", d.target && d.target.name, "node", true);
+            this.field("source", link.source && link.source.name, "node", true) +
+            this.field("target", link.target && link.target.name, "node", true);
     }else{
-        linkstr += "<tr><th class='"+TYPE_CLASS[d.type]+"'>Link:</th><th>"+d.source.name+"&mdash;"+d.target.name+"</th></tr>";
+        linkstr += "<tr><th class='"+TYPE_CLASS[link.type]+"'>Link:</th><th>"+link.source.name+"&mdash;"+link.target.name+"</th></tr>";
     }
 
-    linkstr += _field("description", d.description, "textarea", edit, false, "Descr.") +
-        _field("flow", d.flow, "linkflow", edit) +
-        _field("type", d.type, "linktype", edit) +
-        _field("tools", d.tools, "textarea", edit) +
-        _field("reference", d.reference, "reference", edit, false, "Refs") +
-        _field("links", d.links, "links", edit) +
-        _field("notes", d.notes, "textarea", edit) +
+    linkstr +=
+        this.field("description", link.description, "textarea", edit, false, "Descr.") +
+        this.field("flow", link.flow, "linkflow", edit) +
+        this.field("type", link.type, "linktype", edit) +
+        this.field("tools", link.tools, "textarea", edit) +
+        this.field("reference", link.reference, "reference", edit, false, "Refs") +
+        this.field("links", link.links, "links", edit) +
+        this.field("notes", link.notes, "textarea", edit) +
         "</table>";
     return linkstr;
 }
 
-/* Other utility functions */
-function correctRadius(node, arrow=false) {
-    /*
-     * Correct node radius according to node display,
-     * and whether the link ends with an arrow.
-     */
-    var ret = 1;
-    if(arrow)
-        ret += 2;
-    if(!node.fixed)
-        ret += 1;
-    return ret;
-}
-
-function correctLink(link, dth) {
-    /* 
-     * Correct link endpoints according to node radii.
-     * dth is the minimum angular distance between links (in radians).
-     * Expects nodes to be ellipses.
-     */
-    var rdx = link.target.x - link.source.x,
-        rdy = link.target.y - link.source.y,
-        th  = Math.atan2(rdy, rdx),
-        dth = (link.flow == FLOW_CONNECT ? 0:dth),
-        sdr = correctRadius(link.source, link.flow == FLOW_CONNECT),
-        tdr = correctRadius(link.target, true),
-        s_rx = link.source.rx + sdr,
-        s_ry = link.source.ry + sdr,
-        t_rx = link.target.rx + tdr,
-        t_ry = link.target.ry + tdr,
-        dsx = s_rx * Math.cos(th-dth/2),
-        dsy = s_ry * Math.sin(th-dth/2),
-        dtx = t_rx * Math.cos(th+dth/2),
-        dty = t_ry * Math.sin(th+dth/2),
-        dx  = rdx - dsx - dtx,
-        dy  = rdy - dsy - dty;
-
-    return {
-        x0 : link.source.x + dsx,
-        y0 : link.source.y + dsy,
-        x1 : link.target.x - dtx,
-        y1 : link.target.y - dty,
-        dx : dx,
-        dy : dy,
-        dr : Math.sqrt(dx * dx + dy * dy)*1.4
-    };
-}
-
-function pathline(link) {
-    /*
-     * A line from (x0,y0) to (x1,y1).
-     */
-    return "M" + link.x0 + "," + link.y0 +
-        "L" + link.x1 + "," + link.y1;
-}
-
-function patharc(link) {
-    /*
-     * A circular arc of radius dr from (x0,y0) to (x1,y1).
-     */
-    return "M" + link.x0 + "," + link.y0 +
-        "A" + link.dr + "," + link.dr + " 0 0,1 " +
-        link.x1 + "," + link.y1;
-}
-
-
-/* Metadata */
-
-function metadata_tool(sel, title, callback) {
-    /*
-     * Utility function to activate tools
-     * in the metadata toolbox and assign
-     * the right callback.
-     *
-     * Arguments:
-     *    - sel: a valid selector for a tool
-     *    - title: value of the "title" propery to assign to the tool
-     *    - callback: the callback to assign to the tool
-     */
-    $(sel).prop("title", title);
-    $(sel+" a").off("click").click(callback);
-    $(sel).show();
-}
-
-function metadata_formdata() {
+VGraph.prototype.formdata = function(accessors = {}) {
     /*
      * Gather data from the form and return it in an object =ret=.
+     * See notes below.
+     *
+     * Arguments:
+     *  - accessors: a structure relating field names (field.name)
+     *    with functions that are used to tranform field values.
      *
      * Form fields can encode arrays of values, or arrays of Objects.
      * The former must be named "_FIELD_INDEX", to obtain
@@ -606,13 +580,17 @@ function metadata_formdata() {
      */
     var ret = {};
     var subfields = [];
-    $("#metadata").find("input, textarea, select").each(function() {
+    $(this.id).find("input, textarea, select").each(function() {
         var inputType = this.tagName.toUpperCase() === "INPUT" && this.type.toUpperCase();
         if (inputType !== "BUTTON" && inputType !== "SUBMIT") {
             if(this.name.startsWith("_"))
                 subfields.push(this.name.split("_").splice(1).concat(this.value));
-            else
-                ret[this.name] = this.value;
+            else {
+                var lambda = function(val){return val};
+                if(this.name in accessors)
+                    lambda = accessors[this.name];
+                ret[this.name] = lambda(this.value);
+            }
         }
     });
 
@@ -642,89 +620,127 @@ function metadata_formdata() {
     return ret;
 }
 
-function node_new()  {return metadata({}, "node", true);}
-function node_edit(node) {return metadata(node, "node", true);}
-function node_update(node) {
+VGraph.prototype.node_fromdata = function() {
+    /*
+     * Construct a new node based on the current formdata.
+     */
+    return new Node(this.formdata());
+}
+
+VGraph.prototype.link_fromdata = function() {
+    /*
+     * Construct a new link based on the current formdata.
+     */
+    var link = new Link(this.formdata());
+    console.log(link);
+    link.source = this.graph.nodes[link.source];
+    link.target = this.graph.nodes[link.target];
+    return link;
+}
+
+/* VGraph callbacks */
+VGraph.prototype.activate_tool = function(sel, title, callback) {
+    /*
+     * Utility function to activate tools
+     * in the toolbox and assign the right
+     * callback.
+     *
+     * Arguments:
+     *    - sel: a valid selector for a tool
+     *    - title: value of the "title" propery to assign to the tool
+     *    - callback: the callback to assign to the tool
+     */
+    sel = this.tbox_id+" "+sel;
+    $(sel).prop("title", title);
+    $(sel+" a").off("click").click(callback);
+    $(sel).show();
+}
+VGraph.prototype.node_new = function()  {return this.show({}, "node", true);}
+VGraph.prototype.node_edit = function(node) {return this.show(node, "node", true);}
+VGraph.prototype.node_update = function(node) {
     var retvalue = 0,
-        node2 = metadata_formdata(),
+        node2 = this.node_fromdata(),
         shownode = null;
     if(node.name) {
         message(LOG_DEBUG, "Updating node: ", node, "with", node2);
-        if(updatenode(node, node2) < 0)
+        if(node.update(node2) < 0)
             retvalue = errorHandle("Sorry, could not update node.");
         shownode = node;
     }else{
         message(LOG_DEBUG, "Adding node: ", node2);
-        if(addnode(node2) < 0)
+        if(this.graph.addnode(node2) < 0)
             retvalue = errorHandle("Sorry, could not add the node.");
         shownode = node2;
     }
-    update();
+    this.update();
     if(retvalue == 0)
-        metadata(shownode, "node");
+        this.show(shownode, "node");
     else
-        metadata();
+        this.show();
     return retvalue;
 }
-function node_delete(node) {
+VGraph.prototype.node_delete = function(node) {
     var retvalue = 0;
     message(LOG_DEBUG, "Deleting node: ", node);
     // confirm?
-    if(delnode(node) < 0)
+    if(this.graph.delnode(node) < 0)
         retvalue = errorHandle("Sorry, could not delete the node.");
-    update();
-    metadata();
+    this.update();
+    this.show();
     return retvalue;
 }
 
-function link_new(node)  {
+VGraph.prototype.link_new = function(node)  {
     var init = {};
     if(node)
         init.source = node;
-    return metadata(init, "link", true);
+    return this.show(init, "link", true);
 }
-function link_edit(link) {return metadata(link, "link", true);}
-function link_update(link) {
+VGraph.prototype.link_edit = function(link) {return this.show(link, "link", true);}
+VGraph.prototype.link_update = function(link) {
     var retvalue = 0,
-        link2 = metadata_formdata(),
+        link2 = this.link_fromdata(),
         showlink = null;
     if(link.target) {
         // XXX TODO: use updatelink, after checking that link2{.source,.target} are node objects
         message(LOG_DEBUG, "Updating link: ", link, "with", link2);
-        if(dellink(link) < 0)
+        if(this.graph.dellink(link) < 0)
             retvalue = errorHandle("Sorry, could not delete link.");
-        else if(addlink(link2) < 0) {
-            if(addlink(link) < 0)
-                retvalue = errorHandle("Sorry, original link was corrupted.");
-            else
-                retvalue = errorHandle("Sorry, could not update link.");
+        else {
+            showlink = this.graph.addlink(link2);
+            if(showlink < 0) {
+                if(this.graph.addlink(link) < 0)
+                    retvalue = errorHandle("Sorry, original link was corrupted.");
+                else
+                    retvalue = errorHandle("Sorry, could not update link.");
+            }else
+                showlink = this.graph.links[showlink];
         }
-        showlink = link;
     }else{
         message(LOG_DEBUG, "Adding link: ", link2);
-        if(addlink(link2) < 0)
+        if(this.graph.addlink(link2) < 0)
             retvalue = errorHandle("Sorry, could not add the link.");
         showlink = link2;
     }
-    update();
+    this.update();
     if(retvalue == 0)
-        metadata(showlink, "link");
+        this.show(showlink, "link");
     else
-        metadata();
+        this.show();
     return retvalue;
 }
-function link_delete(link) {
+VGraph.prototype.link_delete = function(link) {
     var retvalue = 0;
     message(LOG_DEBUG, "Deleting link: ", link);
     // confirm?
-    if(dellink(link) < 0)
+    if(this.graph.dellink(link) < 0)
         retvalue = errorHandle("Sorry, could not delete the link.");
-    update();
-    metadata();
+    this.update();
+    this.show();
     return retvalue;
 }
 
-function metadata(d, type, edit=false) {
+VGraph.prototype.show = function(d, type, edit=false) {
     /*
      * Display metadata for node/link =d=, and activate
      * the pertinent tools in the toolbox.
@@ -734,58 +750,390 @@ function metadata(d, type, edit=false) {
      *     - type (string): "node" or "link"
      *     - edit (boolean): display or edit
      */
-    $(".item").hide(); // hide all
+    var self = this;
+    $(this.tbox_id+" .item").hide(); // hide all
     if(type == "node") {
-        $("#metadata").html(nodehtml(d, edit));
+        $(this.data_id).html(this.nodehtml(d, edit));
         if(edit) {
-            metadata_tool(".cancel", "Cancel",	metadata);
-            metadata_tool(".submit", "Save",	function(){node_update(d);});
+            this.activate_tool(".cancel", "Cancel", function(){self.show();});
+            this.activate_tool(".submit", "Save",   function(){self.node_update(d);});
         }else{
-            metadata_tool(".add",  "Add Node",		node_new);
-            metadata_tool(".edit", "Edit Node",		function(){node_edit(d);});
-            metadata_tool(".delete", "Delete Node",	function(){node_delete(d);});
-            metadata_tool(".link", "Link Node", 	function(){link_new(d);});
+            this.activate_tool(".add",  "Add Node",	function(){self.node_new();});
+            this.activate_tool(".edit", "Edit Node",	function(){self.node_edit(d);});
+            this.activate_tool(".delete", "Delete Node",function(){self.node_delete(d);});
+            this.activate_tool(".link", "Link Node", 	function(){self.link_new(d);});
         }
     }else if(type == "link") {
-        $("#metadata").html(linkhtml(d, edit));
+        $(this.data_id).html(this.linkhtml(d, edit));
         if(edit) {
-            metadata_tool(".cancel", "Cancel",	metadata);
-            metadata_tool(".submit", "Save",	function(){link_update(d);});
+            this.activate_tool(".cancel", "Cancel", function(){self.show();});
+            this.activate_tool(".submit", "Save",   function(){self.link_update(d);});
         }else{
-            metadata_tool(".add",  "Add Link",	link_new);
-            metadata_tool(".edit", "Edit Link",	function(){link_edit(d);});
-            metadata_tool(".delete", "Delete Link",	function(){link_delete(d);});
+            this.activate_tool(".add",  "Add Link",	function(){self.link_new();});
+            this.activate_tool(".edit", "Edit Link",	function(){self.link_edit(d);});
+            this.activate_tool(".delete", "Delete Link",function(){self.link_delete(d);});
         }
     }else{
-        $("#metadata").html("")
-        metadata_tool(".add",  "Add Node",  node_new);
+        $(this.data_id).html("");
+        this.activate_tool(".add",  "Add Node",  function(){self.node_new();});
     }
     // Adjust box height
-    $("#metadata").height( "auto" );
-    var Hdata    = $("#metadata").outerHeight(),
-        Htoolbox = $("#metadata_toolbox").outerHeight(),
+    $(this.data_id).height( "auto" );
+    var Hdata    = $(this.data_id).outerHeight(),
+        Htoolbox = $(this.tbox_id).outerHeight(),
         Hbox     = Hdata + Htoolbox;
     if(Hbox > height) { // cap to svg height
         Hbox = height;
-        $("#metadata").height( Hbox - Htoolbox );
+        $(this.data_id).height( Hbox - Htoolbox );
     }
-    $("#metadata_box").animate({
+    $(this.id).animate({
         height: Hbox
     });
 }
 
+/* GraphLayout */
+var GraphLayout = function(id, filein, type="json") {
+    /*
+     * Construct a datagraph in the specified div ($("#id")),
+     * and populate it with data from the =filein= input file
+     * of type =type=.
+     */
+    this.svg = d3.select(id).append("svg")
+        .attr({
+            width: 900,
+            height: height
+        });
 
-/* Toolbox */
+    this.link_dist = Math.min(width,height)/4.0;
+    this.link_spread = 0.3; // radians
+    this.graph = new Graph();
 
-function make_toolbox() {
+    var self = this;
+    if(type=="csv") 
+        d3.csv(filein, function(link){self.graph.addlink(link);},
+               function(error, data) {
+                   if(error)
+                       errorHandle(error);
+                   else
+                       self.init();
+               });
+    else if(type=="json")
+        d3.json(filein,
+                function(error, data) {
+                    if(error)
+                        errorHandle(error);
+                    else {
+                        data.nodes.forEach(function(node){self.graph.addnode(node);});
+                        data.links.forEach(function(link){self.graph.addlink(link);});
+                        self.init();
+                    }
+                });
+
+    this.make_markers();
+    this.make_legend();
+    this.make_toolbox(
+        [
+            function() {circle(self);},
+            function() {hexagon(self);},
+            function() {self.release();},
+        ],
+        ["images/circle.svg", "images/hexagon.svg", "images/release.svg"]
+    );
+    
+    this.node_callback = null;
+    this.link_callback = null;
+    return this;
+}
+
+GraphLayout.prototype.init = function() {
+    /*
+     * Build the UI of the datagraph.
+     */
+    // Create containers (links below nodes)
+    this.svg.append("g").attr("id","link-container");
+    this.svg.append("g").attr("id","node-container");
+    var self = this;
+    // Create layout
+    this.force = d3.layout.force()
+        .linkDistance(this.link_dist)
+        .linkStrength(.02)
+        .charge(-120)
+        .gravity(.015)
+        .size([width, height])
+        .on("tick", function() {
+            /*
+             * Main timestep function.
+             * Handle one timestep of the force simulation.
+             * To update positions in the layout, call:
+             *    force.alpha(f) with f>0.0
+             */
+            var node = self.svg.selectAll('.node');
+            node.attr({
+                transform: function(d) {
+                    if(d.conf && this.getAttribute("cx")) {
+                        d.x = parseFloat(this.getAttribute("cx"));
+                        d.y = parseFloat(this.getAttribute("cy"));
+                    }
+                    return "translate(" + d.x + "," + d.y + ")"; },
+                class: function(d) {
+                    var cl = "node";
+                    if(d.fixed) cl += " fixed";
+                    return cl;
+                }
+            });
+            
+            var link = self.svg.selectAll('.link');
+            link.attr("d", function(d) {
+                var clink = self.correctLink(d, self.link_spread);
+                if(d.weight == 1 || d.flow == FLOW_CONNECT) 
+                    return self.pathline(clink);
+                else
+                    return self.patharc(clink);
+            }).style("opacity", function(d) {
+                var clink = self.correctLink(d, self.link_spread),
+                    invmindist = 0.03; // 3/link_dist
+                return Math.min(1.0, invmindist*clink.dr);
+                /* Some useful debugging:
+                   if(d.tools=="cgDNA")
+                   $("#debug").text(
+                   clink.x0.toFixed(1)+","+clink.y0.toFixed(1)+","+
+                   clink.x1.toFixed(1)+","+clink.y1.toFixed(1)+","+
+                   clink.dx.toFixed(1)+","+clink.dy.toFixed(1)+","+
+                   clink.dr.toFixed(1)+","+(invmindist*clink.dr).toFixed(1));
+                */
+            });
+        });
+    this.force
+        .nodes(this.graph.nodes)
+        .links(this.graph.links);
+    this.update();
+};
+
+GraphLayout.prototype.update = function() {
+    /*
+     * Update the datagraph visualisation.
+     * Call this whenever the data changes (including at init time)
+     */
+    var self = this;
+    // Add/update links
+    var link = this.svg.select("#link-container").selectAll('.link')
+        .data(this.graph.links);
+
+    link.exit().remove();
+
+    var linkEnter = link.enter().append('path')
+        .on("click", function(d) {
+            /*
+             * Callback for clicking links
+             */
+            message(LOG_DEBUG, d);
+            if(self.link_callback)
+                self.link_callback(d);
+        });
+    link.attr({
+        class: 		function(d) {
+            return "link " + TYPE_CLASS[d.type];
+        },
+        'marker-end': 	function(d) {
+            return "url(#rarrow"+d.type+")";
+        },
+        'marker-start':	function(d) {
+            if(d.flow == FLOW_CONNECT)
+                return "url(#larrow"+d.type+")";
+        }});
+
+    /* Ideally this is done with positional markers;
+     * tick() updates their position given the direction.
+     * See https://www.w3.org/TR/svg-markers/.
+     * 
+     *linkEnter.append('marker')
+     *        .attr({
+     *         'href': 'url(#rarrow)',
+     *         'position': '90%'});
+     */
+
+    // Add/update nodes
+    var node = this.svg.select("#node-container").selectAll('.node')
+        .data(this.graph.nodes);
+
+    node.exit().remove();
+
+    var nodeEnter = node.enter().append('g')
+        .attr('class', 'node')
+        .on("click", function(d) {
+            /*
+             * Callback for clicking nodes
+             */
+            message(LOG_DEBUG, d);
+            if (d3.event.defaultPrevented) return; // ignore drag
+            if (d3.event.shiftKey) {
+                d.fixed = !d.fixed;
+            }
+            self.refresh();
+            if(self.node_callback)
+                self.node_callback(d);
+        })
+        .call(this.force.drag);
+
+    nodeEnter.append("ellipse") // Add ellipse
+        .attr('class', 'nodecirc');
+    // Use selection.select to propagate data to children
+    node.select('.nodecirc')
+        .attr({
+            rx: function(d) {return d.rx;},
+            ry: function(d) {return d.ry;}});
+
+    nodeEnter.append("text")    // Add text
+        .attr({
+            class: 'nodetxt',
+            dy: 5,
+            'text-anchor': "middle",
+        });
+    // Use selection.select to propagate data to children
+    node.select('.nodetxt')
+        .text(function(d) { return d.name; });
+
+    this.force.start();
+}
+
+GraphLayout.prototype.refresh = function() {
+    /* Let the layout adapt to changes */
+    this.force.alpha(1.0);
+}
+
+GraphLayout.prototype.release = function() {
+    /* Unfix all nodes */
+    this.graph.nodes.forEach(function(d) {d.fixed=false;});
+    this.refresh();
+}
+
+/* Callback functions */
+GraphLayout.prototype.on = function(event, callback) {
+    /*
+     * Register and event callback
+     */
+    if(event == "node_click")
+        this.node_callback = callback;
+    else if(event == "link_click")
+        this.link_callback = callback;
+    else
+        message(LOG_ERROR, "Event "+event+" not supported");
+}
+
+/* Other utility functions */
+GraphLayout.prototype.correctRadius = function(node, arrow=false) {
+    /*
+     * Correct node radius according to node display,
+     * and whether the link ends with an arrow.
+     */
+    var ret = 1;
+    if(arrow)
+        ret += 2;
+    if(!node.fixed)
+        ret += 1;
+    return ret;
+}
+
+GraphLayout.prototype.correctLink = function(link, dth) {
+    /* 
+     * Correct link endpoints according to node radii.
+     * dth is the minimum angular distance between links (in radians).
+     * Expects nodes to be ellipses.
+     */
+    var rdx = link.target.x - link.source.x,
+        rdy = link.target.y - link.source.y,
+        th  = Math.atan2(rdy, rdx),
+        dth = (link.flow == FLOW_CONNECT ? 0:dth),
+        sdr = this.correctRadius(link.source, link.flow == FLOW_CONNECT),
+        tdr = this.correctRadius(link.target, true),
+        s_rx = link.source.rx + sdr,
+        s_ry = link.source.ry + sdr,
+        t_rx = link.target.rx + tdr,
+        t_ry = link.target.ry + tdr,
+        dsx = s_rx * Math.cos(th-dth/2),
+        dsy = s_ry * Math.sin(th-dth/2),
+        dtx = t_rx * Math.cos(th+dth/2),
+        dty = t_ry * Math.sin(th+dth/2),
+        dx  = rdx - dsx - dtx,
+        dy  = rdy - dsy - dty;
+
+    return {
+        x0 : link.source.x + dsx,
+        y0 : link.source.y + dsy,
+        x1 : link.target.x - dtx,
+        y1 : link.target.y - dty,
+        dx : dx,
+        dy : dy,
+        dr : Math.sqrt(dx * dx + dy * dy)*1.4
+    };
+}
+
+GraphLayout.prototype.pathline = function(link) {
+    /*
+     * A line from (x0,y0) to (x1,y1).
+     */
+    return "M" + link.x0 + "," + link.y0 +
+        "L" + link.x1 + "," + link.y1;
+}
+
+GraphLayout.prototype.patharc = function(link) {
+    /*
+     * A circular arc of radius dr from (x0,y0) to (x1,y1).
+     */
+    return "M" + link.x0 + "," + link.y0 +
+        "A" + link.dr + "," + link.dr + " 0 0,1 " +
+        link.x1 + "," + link.y1;
+}
+
+/* Location functions */
+GraphLayout.prototype.locations = function(locations, scale) {
+    /*
+     * Set the location of nodes in the layout by using
+     * the information specified in =locations=, scaled
+     * by =scale=.
+     *
+     * Arguments:
+     *    - locations: a structure relating node names,
+     *      as strings, to [x, y] pairs, where [0, 0] is
+     *      the center of the svg.
+     *    - scale: a scalar used to multiply coordinates.
+     */
+    var node = this.svg.selectAll('.node');
+    node.attr({
+        cx: function(d){d.fixed=true; d.conf=true; return d.x;},
+        cy: function(d){return d.y;}
+    });
+    node.transition().duration(transitionDuration).attr({
+        cx: function(d) {
+            var loc = locations[d.name];
+            if(!loc) {
+                message(LOG_WARN, d.name+" not found in locations!");
+                return width/2;
+            }
+            return scale*loc[0]+width/2;
+        },
+        cy: function(d) {
+            var loc = locations[d.name];
+            if(!loc) {
+                message(LOG_WARN, d.name+" not found in locations!");
+                return height/2;
+            }
+            return 0.9*height-scale*loc[1];
+        }})
+        .each("end", function(d) {d.px=d.x; d.py=d.y; d.conf=false;});
+    this.refresh();
+}
+
+/* Other UI functions */
+GraphLayout.prototype.make_toolbox = function(functions, icons) {
     /*
      * Generate the MIN Toolbox, according to
      * configuration (see TOOL* variables).
      */
-
-    var toolbox = svg.append("g").attr("class","toolbox")
-        .attr("transform","translate("+(width-TOOLmh-TOOL_SIZE*NTOOL)+","+TOOLmv+")")
-        .selectAll(".tool").data(TOOL_FUN);
+    var ntool = functions.length;
+    var toolbox = this.svg.append("g").attr("class","toolbox")
+        .attr("transform","translate("+(width-TOOLmh-TOOL_SIZE*ntool)+","+TOOLmv+")")
+        .selectAll(".tool").data(functions);
     var tool = toolbox.enter().append("g")
         .attr({
             class: "tool",
@@ -793,7 +1141,7 @@ function make_toolbox() {
                 return "translate("+i*TOOL_SIZE+",0)";}
         })
         .on("click", function (d, i) {
-            TOOL_FUN[i].call();
+            d.call();
         });
     tool.append("rect")
         .attr({
@@ -802,19 +1150,18 @@ function make_toolbox() {
         })
     tool.append("image")
         .attr({
-            "xlink:href": function(d,i){return TOOL_ICON[i];},
+            "xlink:href": function(d,i){return icons[i];},
             width: TOOL_SIZE,
             height: TOOL_SIZE,
         });
 }
 
-function make_legend() {
+GraphLayout.prototype.make_legend = function() {
     /*
      * Generate the legend according to configuration
      * (see LEGEND_* variables).
      */
-
-    var legend = svg.append("g").attr("class","legend");
+    var legend = this.svg.append("g").attr("class","legend");
     var entries = legend.selectAll(".entry").data(TYPE_CLASS);
     var Eenter = entries.enter().append("g")
         .attr({
@@ -849,293 +1196,48 @@ function make_legend() {
         });
 }
 
-function make_markers() {
+GraphLayout.prototype.make_markers = function() {
     /*
      * Create required markers for arrows
      */
-    var defs = svg.append("defs");
+    var defs = this.svg.append("defs");
     var mkw = 3.0;
 
     for(t=0; t<NTYPES; t++) {
         defs.append("marker")
-	    .attr({
-	        id: "rarrow"+t,
-	        viewBox: "0 -5 10 10",
-	        refX: 8,
-	        refY: 0,
-	        markerWidth: mkw,
-	        markerHeight: mkw,
-	        orient: "auto"
-	    })
-	    .append("path")
-	    .attr({
+           .attr({
+               id: "rarrow"+t,
+               viewBox: "0 -5 10 10",
+               refX: 8,
+               refY: 0,
+               markerWidth: mkw,
+               markerHeight: mkw,
+               orient: "auto"
+           })
+           .append("path")
+           .attr({
                 d: "M0,-5L10,0L0,5",
-	        class: "arrowHead "+TYPE_CLASS[t]});
+               class: "arrowHead "+TYPE_CLASS[t]});
 
         defs.append("marker")
-	    .attr({
-	        id: "larrow"+t,
-	        viewBox: "0 -5 10 10",
-	        refX: 2,
-	        refY: 0,
-	        markerWidth: mkw,
-	        markerHeight: mkw,
-	        orient: "auto"
-	    })
-	    .append("path")
-	    .attr({
+           .attr({
+               id: "larrow"+t,
+               viewBox: "0 -5 10 10",
+               refX: 2,
+               refY: 0,
+               markerWidth: mkw,
+               markerHeight: mkw,
+               orient: "auto"
+           })
+           .append("path")
+           .attr({
                 d: "M10,-5L0,0L10,5",
-	        class: "arrowHead "+TYPE_CLASS[t]});
+               class: "arrowHead "+TYPE_CLASS[t]});
     }
 }
 
-/* Main Datagraph structure */
-// XXX Use the function.call(instance) pattern
-//     to wrap all this into an object with an
-//     assigned id, tsv; then the _this pattern
-//     can be used for callbacks.
-function datagraph(id, filein, type="json") {
-    /*
-     * Construct a datagraph in the specified div ($("#id")),
-     * and populate it with data from the =filein= input file
-     * of type =type=.
-     */
-    svg = d3.select(id).append("svg")
-        .attr({
-            width: 900,
-            height: height
-        });
 
-    make_markers();
-    make_legend();
-    make_toolbox();
-
-    graph.nodes = [];
-    graph.links = [];
-
-    if(type=="csv") 
-        d3.csv(filein, addlink,
-               function(error, data) {
-                   if(error)
-                       errorHandle(error);
-                   else
-                       init();
-               });
-    else if(type=="json")
-        d3.json(filein,
-                function(error, data) {
-                    if(error)
-                        errorHandle(error);
-                    else {
-                        data.nodes.forEach(addnode);
-                        data.links.forEach(addlink);
-                        init();
-                    }
-                });
-    return this;
-}
-
-function init() {
-    /*
-     * Build the UI of the datagraph.
-     */
-    // Create containers (links below nodes)
-    svg.append("g").attr("id","link-container");
-    svg.append("g").attr("id","node-container");
-    // Create layout
-    force = d3.layout.force()
-        .linkDistance(link_dist)
-        .linkStrength(.02)
-        .charge(-120)
-        .gravity(.015)
-        .size([width, height])
-        .on("tick", tick);
-    force
-        .nodes(graph.nodes)
-        .links(graph.links);
-    metadata();
-    update();
-};
-
-function update() {
-    /*
-     * Update the datagraph visualisation.
-     * Call this whenever the data changes (including at init time)
-     */
-    // Add/update links
-    var link = svg.select("#link-container").selectAll('.link')
-        .data(graph.links);
-
-    link.exit().remove();
-
-    var linkEnter = link.enter().append('path')
-            .on("click", clicklink);
-    link.attr({
-        class: 		function(d) {
-            return "link " + TYPE_CLASS[d.type];
-        },
-        'marker-end': 	function(d) {
-            return "url(#rarrow"+d.type+")";
-        },
-        'marker-start':	function(d) {
-            if(d.flow == FLOW_CONNECT)
-                return "url(#larrow"+d.type+")";
-        }});
-
-    /* Ideally this is done with positional markers;
-     * tick() updates their position given the direction.
-     * See https://www.w3.org/TR/svg-markers/.
-     * 
-     *linkEnter.append('marker')
-     *        .attr({
-     *         'href': 'url(#rarrow)',
-     *         'position': '90%'});
-     */
-
-    // Add/update nodes
-    var node = svg.select("#node-container").selectAll('.node')
-        .data(graph.nodes);
-
-    node.exit().remove();
-
-    var nodeEnter = node.enter().append('g')
-        .attr('class', 'node')
-        .on("click", clicknode)
-        .call(force.drag);
-
-    nodeEnter.append("ellipse") // Add ellipse
-        .attr('class', 'nodecirc');
-    // Use selection.select to propagate data to children
-    node.select('.nodecirc')
-        .attr({
-            rx: function(d) {return d.rx;},
-            ry: function(d) {return d.ry;}});
-
-    nodeEnter.append("text")    // Add text
-        .attr({
-            class: 'nodetxt',
-            dy: 5,
-            'text-anchor': "middle",
-        });
-    // Use selection.select to propagate data to children
-    svg.selectAll('.node').select('.nodetxt')
-        .text(function(d) { return d.name; });
-
-    force.start();
-}
-
-function tick() {
-    /*
-     * Main timestep function.
-     * Handle one timestep of the force simulation.
-     * To update positions in the layout, prefer calling:
-     *    force.alpha(f) with f>0.0
-     */
-
-    var node = svg.selectAll('.node');
-    node.attr({
-        transform: function(d) {
-            if(d.conf && this.getAttribute("cx")) {
-                d.x = parseFloat(this.getAttribute("cx"));
-                d.y = parseFloat(this.getAttribute("cy"));
-            }
-            return "translate(" + d.x + "," + d.y + ")"; },
-        class: function(d) {
-            var cl = "node";
-            if(d.fixed) cl += " fixed";
-            return cl;
-        }
-    });
-
-    var link = svg.selectAll('.link');
-    link.attr("d", function(d) {
-        var clink = correctLink(d, link_spread);
-        if(d.weight == 1 || d.flow == FLOW_CONNECT) 
-            return pathline(clink);
-        else
-            return patharc(clink);
-    }).style("opacity", function(d) {
-            var clink = correctLink(d, link_spread),
-                invmindist = 0.03; // 3/link_dist
-        return Math.min(1.0, invmindist*clink.dr);
-        /* Some useful debugging:
-           if(d.tools=="cgDNA")
-             $("#debug").text(
-             clink.x0.toFixed(1)+","+clink.y0.toFixed(1)+","+
-             clink.x1.toFixed(1)+","+clink.y1.toFixed(1)+","+
-             clink.dx.toFixed(1)+","+clink.dy.toFixed(1)+","+
-             clink.dr.toFixed(1)+","+(invmindist*clink.dr).toFixed(1));
-        */
-        });    
-}
-
-function refresh() {
-    /* Let the layout adapt to changes */
-    force.alpha(1.0);
-}
-
-function release() {
-    /* Unfix all nodes */
-    graph.nodes.forEach(function(d) {d.fixed=false;});
-    refresh();
-}
-
-/* Callback functions */
-function clicknode(d) {
-    message(LOG_DEBUG, d);
-    metadata(d, "node");
-    if (d3.event.defaultPrevented) return; // ignore drag
-    if (d3.event.shiftKey) {
-        d.fixed = !d.fixed;
-    }
-    refresh();
-}
-
-function clicklink(d) {
-    message(LOG_DEBUG, d);
-    metadata(d, "link");
-}
-
-/* Location functions */
-function graphApply(locations, scale) {
-    /*
-     * Set the location of nodes in the layout by using
-     * the information specified in =locations=, scaled
-     * by =scale=.
-     *
-     * Arguments:
-     *    - locations: a structure relating node names,
-     *      as strings, to [x, y] pairs, where [0, 0] is
-     *      the center of the svg.
-     *    - scale: a scalar used to multiply coordinates.
-     */
-    var node = svg.selectAll('.node');
-    node.attr({
-        cx: function(d){d.fixed=true; d.conf=true; return d.x;},
-        cy: function(d){return d.y;}
-    });
-    node.transition().duration(transitionDuration).attr({
-        cx: function(d) {
-            var loc = locations[d.name];
-            if(!loc) {
-                message(LOG_WARN, d.name+" not found in locations!");
-                return width/2;
-            }
-            return scale*loc[0]+width/2;
-        },
-        cy: function(d) {
-            var loc = locations[d.name];
-            if(!loc) {
-                message(LOG_WARN, d.name+" not found in locations!");
-                return height/2;
-            }
-            return 0.9*height-scale*loc[1];
-        }})
-        .each("end", function(d) {d.px=d.x; d.py=d.y; d.conf=false;});
-    refresh();
-}
-
-function pentagon() {
+function pentagon(layout) {
     var a=0.32,
         b=0.53,
         c=0.62,
@@ -1152,10 +1254,10 @@ function pentagon() {
         "Models (kbp)":	 [-a, 0],
         "DNA MD":	 [-a, d],
         "FISH":		 [-a*0.6, c*0.4]};
-    graphApply(locations, scale);
+    layout.locations(locations, scale);
 }
 
-function hexagon() {
+function hexagon(layout) {
     var a=0.5,
         b=1.0,
         c=1.0,
@@ -1172,14 +1274,14 @@ function hexagon() {
 	"Models (kbp)":	 [-a, 0],
 	"DNA MD":	 [-a, d],
 	"FISH":		 [-a*0.7, c*0.45]};
-    graphApply(locations, scale);
+    layout.locations(locations, scale);
 }
 
-function circle(random = false) {
+function circle(layout, random = false) {
     var scale=200,
         locations = {},
         th;
-    graph.nodes.forEach(function(d,i,A) {
+    layout.graph.nodes.forEach(function(d,i,A) {
         if(random)
             th = Math.random() * 2 * PI;
         else
@@ -1188,6 +1290,6 @@ function circle(random = false) {
             Math.cos(th),
             Math.sin(th)+1];
     });
-    graphApply(locations, scale);
+    layout.locations(locations, scale);
 }
 

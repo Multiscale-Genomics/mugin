@@ -31,7 +31,7 @@ dl.footnotes dd {
 }
 
 /* metadata */
-#metadata_box {
+#graph_info {
     top: 10px;
     right: 10px;
     width: 280px;
@@ -79,25 +79,25 @@ th.maybe {
     width: 100%;
 }
 
-#metadata_toolbox {
+#toolbox {
     position: absolute;
     bottom: 0px;
     width: 100%;
     border-top: 2px solid #777;
     padding: 0;
 }
-#metadata_toolbox .item {
+#toolbox .item {
     margin: 2.5px 0 2.5px 5px;
     display: none;
 }
-#metadata_box .item a {
+#toolbox .item a {
     color: #777;
     font-size: 13px;
 }
-#metadata_box .item a:hover {
+#toolbox .item a:hover {
     cursor:pointer;
 }
-#metadata_toolbox .add {
+#toolbox .add {
     display: inline-block;
 }
 
