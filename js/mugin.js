@@ -50,7 +50,7 @@ var NFLOWS = 2,
     FLOW_DESCRIPTION = ["Connect (<->)", "Inform (->)"];
 
 /* Logging */
-var LOG_LEVEL = 0,
+var LOG_LEVEL = 3,
     LOG_DEBUG = 0,
     LOG_INFO  = 1,
     LOG_WARN  = 2,
@@ -120,7 +120,6 @@ function updateobject(obj, obj2) {
      * Deep copy all contents of obj2 to obj, overwriting
      * when required.
      */
-    // XXX TODO: move to the Node/Link prototype
     for (var prop in obj2) {
         var val = obj2[prop];
         if (typeof val == "object") { // this also applies to arrays or null!
@@ -132,7 +131,8 @@ function updateobject(obj, obj2) {
     }
 }
 
-/* Node, Link, Graph
+/*
+ * Node, Link, Graph
  */
 var CopyObject = function(object) { // copy constructor
     $.extend(this, object);
@@ -159,7 +159,7 @@ var Link = function(object) {
 Link.prototype = Object.create(CopyObject.prototype);
 Link.prototype.constructor = Link;
 
-Link.prototype.updatelink = function(link2) {
+Link.prototype.update = function(link2) {
     /*
      * Update =link= with all fields in =link2=,
      * overwriting when required.
@@ -362,15 +362,13 @@ Graph.prototype.tojson = function() {
 }
 
 
-/* VGraph: view/edit graph info
- * XXX extend Graph and implement VNode and VLink?
+/*
+ * VGraph: view/edit graph info
  */
 
 var VGraph = function(graph, id, callbacks = []){
     /*
-     * Expects to find a div#metadata and div#toolbox within div#id;
-     *
-     *
+     * Expects to find a div#metadata and div#toolbox within div#id.
      *
      */
     this.graph = graph;
@@ -632,7 +630,6 @@ VGraph.prototype.link_fromdata = function() {
      * Construct a new link based on the current formdata.
      */
     var link = new Link(this.formdata());
-    console.log(link);
     link.source = this.graph.nodes[link.source];
     link.target = this.graph.nodes[link.target];
     return link;
@@ -702,20 +699,10 @@ VGraph.prototype.link_update = function(link) {
         link2 = this.link_fromdata(),
         showlink = null;
     if(link.target) {
-        // XXX TODO: use updatelink, after checking that link2{.source,.target} are node objects
         message(LOG_DEBUG, "Updating link: ", link, "with", link2);
-        if(this.graph.dellink(link) < 0)
-            retvalue = errorHandle("Sorry, could not delete link.");
-        else {
-            showlink = this.graph.addlink(link2);
-            if(showlink < 0) {
-                if(this.graph.addlink(link) < 0)
-                    retvalue = errorHandle("Sorry, original link was corrupted.");
-                else
-                    retvalue = errorHandle("Sorry, could not update link.");
-            }else
-                showlink = this.graph.links[showlink];
-        }
+        if(link.update(link2) < 0)
+            retvalue = errorHandle("Sorry, could not update link.");
+        showlink = link;
     }else{
         message(LOG_DEBUG, "Adding link: ", link2);
         if(this.graph.addlink(link2) < 0)
@@ -732,7 +719,6 @@ VGraph.prototype.link_update = function(link) {
 VGraph.prototype.link_delete = function(link) {
     var retvalue = 0;
     message(LOG_DEBUG, "Deleting link: ", link);
-    // confirm?
     if(this.graph.dellink(link) < 0)
         retvalue = errorHandle("Sorry, could not delete the link.");
     this.update();
