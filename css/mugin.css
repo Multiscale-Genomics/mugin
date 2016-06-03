@@ -118,13 +118,24 @@ th.maybe {
     pointer-events: none;
 }
 
+.node:hover {
+    stroke-width: 5px;
+}
+
 .link {
     fill: none;
-    stroke: #777;
+}
+
+.link.hid {
+    stroke-width: 25;
+    stroke: rgba(0,0,0,0.0);
+}
+
+.link.viz {
     stroke-width: 4;
 }
 
-.link:hover {
+.linkg:hover .viz {
     stroke-width: 6;
 }
 

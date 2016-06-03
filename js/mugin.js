@@ -1045,12 +1045,14 @@ GraphLayout.prototype.update = function() {
      */
     var self = this;
     // Add/update links
-    var link = this.svg.select("#link-container").selectAll('.link')
+    var link = this.svg.select("#link-container").selectAll('.linkg')
         .data(this.graph.links);
 
     link.exit().remove();
 
-    var linkEnter = link.enter().append('path')
+    //var linkEnter = link.enter().append('path')
+    var linkEnter = link.enter().append('g')
+        .attr("class", "linkg")
         .on("click", function(d) {
             /*
              * Callback for clicking links
@@ -1059,17 +1061,24 @@ GraphLayout.prototype.update = function() {
             if(self.link_callback)
                 self.link_callback(d);
         });
-    link.attr({
-        class: 		function(d) {
-            return "link " + TYPE_CLASS[d.type];
-        },
-        'marker-end': 	function(d) {
-            return "url(#rarrow"+d.type+")";
-        },
-        'marker-start':	function(d) {
-            if(d.flow == FLOW_CONNECT)
-                return "url(#larrow"+d.type+")";
-        }});
+    
+    linkEnter.append("path") // Add invisible path
+        .attr('class', 'link hid');
+    linkEnter.append("path") // Add visible path
+        .attr('class', 'link viz');
+    // Use selection.select to propagate data to children
+    link.select('.viz')
+        .attr({
+            class: 		function(d) {
+                return "link viz " + TYPE_CLASS[d.type];
+            },
+            'marker-end': 	function(d) {
+                return "url(#rarrow"+d.type+")";
+            },
+            'marker-start':	function(d) {
+                if(d.flow == FLOW_CONNECT)
+                    return "url(#larrow"+d.type+")";
+            }});
 
     /* Ideally this is done with positional markers;
      * tick() updates their position given the direction.
