@@ -50,7 +50,7 @@ var NFLOWS = 2,
     FLOW_DESCRIPTION = ["Connect (<->)", "Inform (->)"];
 
 /* Logging */
-var LOG_LEVEL = 3,
+var LOG_LEVEL = 0,
     LOG_DEBUG = 0,
     LOG_INFO  = 1,
     LOG_WARN  = 2,
@@ -132,39 +132,108 @@ function updateobject(obj, obj2) {
 }
 
 /*
- * Node, Link, Graph
+ * CopyObject:
+ * An object implementing a copy constructor and the ability
+ * of being updated with the contents of another object.
  */
 var CopyObject = function(object) { // copy constructor
-    $.extend(this, object);
+    $.extend(true, this, object);
 }
+CopyObject.prototype.update = function(obj2) {
+    /*
+     * Update object with all fields in =obj2=,
+     * overwriting when required.
+     */
+    return $.extend(true, this, obj2);
+}
+
+/*
+ * HyperLink: A hypertext link
+ *
+ * - text: the text to be displayed
+ * - link: a valid URL
+ */ 
+var HyperLink = function(object) {
+    this.text = undefined;
+    this.link = undefined;
+    CopyObject.call(this, object);
+    if(this.text == undefined)
+        this.text = this.link;
+}
+HyperLink.prototype = Object.create(CopyObject.prototype);
+HyperLink.prototype.constructor = HyperLink;
+
+/*
+ * Node: A graph node
+ *
+ * - name: the name of the node; used to distinguish nodes.
+ * - description: a meaningful description of the node.
+ */ 
 var Node = function(object) {
+    this.name = undefined;
+    this.description = undefined;
     CopyObject.call(this, object);
 }
 Node.prototype = Object.create(CopyObject.prototype);
 Node.prototype.constructor = Node;
-
 Node.prototype.update = function(node2) {
-    /*
-     * Update node with all fields in =node2=,
-     * overwriting when required.
-     */
-    $.extend(this, node2);
+    CopyObject.prototype.update.call(this, node2);
     message(LOG_DEBUG, "Updated node: ", this);
     return 0;
 }
 
+
+/*
+ * Link: A graph link
+ *
+ * - source:  the source node for the link (see Note 1)
+ * - target:  the target node for the link (see Note 1)
+ * - description:  a meaningful description of the link
+ * - flow:  the flow of the link (see Note 2)
+ * - type:  the link type (see Note 3)
+ * - reference:  a list of literary references with links to
+ *   the source material (see HyperLink)
+ * - tools:  a list of pertinent available software tools (see
+ *   HyperLink).
+ * - links:  a list of relevant web pages (see HyperLink)
+ * - weight:  number of links that share the same endpoints
+ * - notes:  a free text field for comments
+ *
+ * Note 1: source and target can be expressed in 3 ways:
+ *  - the index of the node in the parent Graph's list of nodes
+ *  - the name of the node (name property of the node)
+ *  - the node object from the parent Graph's list of nodes
+ *
+ * Note 2: there are 2 flow types defined:
+ *   0. Connect: The two data types have been used together to
+ *      perform a scientific task 
+ *   1. Inform: One data type informs the other to generate
+ *      scientific data
+ *
+ * Note 3: there are 3 link types defined:
+ *   0. Pertinent software tools are available.
+ *   1. The connections has been demonstrated to be
+ *      scientifically relevant in the literature, but software 
+ *      tools are still unavailable.
+ *   2. The connection has been discussed as potentially
+ *      relevant for MuG.
+ */ 
 var Link = function(object) {
+    this.source = undefined;
+    this.target = undefined;
+    this.description = undefined;
+    this.flow = undefined;
+    this.type = undefined;
+    this.reference = undefined;
+    this.tools = undefined;
+    this.links = undefined;
+    this.notes = undefined;
     CopyObject.call(this, object);
 }
 Link.prototype = Object.create(CopyObject.prototype);
 Link.prototype.constructor = Link;
-
 Link.prototype.update = function(link2) {
-    /*
-     * Update =link= with all fields in =link2=,
-     * overwriting when required.
-     */
-    $.extend(this, link2);
+    CopyObject.prototype.update.call(this, link2);
     message(LOG_DEBUG, "Updated link: ", this);
     return 0;
 }
@@ -198,9 +267,142 @@ Link.prototype.get_directed_linkid = function() {
     return src*1e10+trg;
 }
 
+/*
+ * Graph: a collection of nodes and links.
+ * Graph contains methods to add/remove/update links in a form
+ * which is compatible with subsequent viewing with D3.js.
+ *
+ * Methods:
+ *  - addnode(node):   adds a node
+ *  - addlink(link):   adds a link
+ *  - delnode(node):   adds a node
+ *  - dellink(link):   adds a link
+ *  - calculate_weights(link, deleted):  update the weight
+ *    (i.e. the number of links with same endpoints) of all 
+ *    links that share endpoints with the argument.
+ *  - to_json():  return a JSON string representing the graph.
+ */
+
 var Graph = function() {
     this.nodes = [];
     this.links = [];
+}
+
+Graph.prototype.addnode = function(node) {
+    /*
+     * Add a node to the graph, and return the index of the
+     * added node or -1 upon failure. If a node with the same
+     * name exists, return its index. 
+     *
+     * Arguments:
+     *   - node: a structure containing the node
+     *     name and description.
+     *
+     */
+    if(node.name == undefined)
+        return -1;
+    var nodelist = this.nodes.map(function(d){return d.name;});
+    if(nodelist.indexOf(node.name) >= 0)
+        return nodelist.indexOf(node.name);
+
+    node = new Node(node);
+    return this.nodes.push(node) - 1;
+}
+
+Graph.prototype.addlink = function(link) {
+    /*
+     * Add a link to the graph; see Link.
+     * Returns the index of the added link, or -1 upon failure.
+     * By convention, if link.source or link.target are
+     * strings, then a node with that name is added.
+     */
+    link = new Link(link);
+    // Add nodes
+    if(link.source == undefined)
+        return -1;
+
+    var ids = link.get_nodeids(),
+        src = ids[0],
+        trg = ids[1];
+    if (typeof link.source == "string")
+        src = this.addnode({name: link.source});
+    if (typeof link.target == "string")
+        trg = this.addnode({name: link.target});
+
+    message(LOG_DEBUG, "Graph: addlink: ", link.source, link.target, src, trg);
+
+    // Turn around when flow is negative
+    if(link.flow == -1) {
+        var tmp = src;
+        src=trg;
+        trg=tmp;
+        link.flow = 1;
+    }
+
+    link.source = src;
+    link.target = trg;
+
+    // Correct weights
+    var weight = this.calculate_weights(link);
+    if(weight < 0) // skip
+        return -1;
+    link.weight = weight;
+
+    // Parse references & links if text (CSV)
+    if(typeof link.reference == "string") {
+        var refs = link.reference.split(";");
+        var links = link.links.split(";");
+        link.reference = 
+            refs.map(function(ref, i) {
+                return new HyperLink({link: links[i], text: ref});
+            });
+        link.links = links.slice(refs.length);
+    }
+
+    // Parse links if text (CSV)
+    link.links = link.links.map(function(l,i) {
+        if(typeof l == "string")
+            return new HyperLink({link: l, text: l});
+        else
+            return new HyperLink(l);
+    });
+
+    // Parse tools if text (CSV)
+    if(typeof link.tools == "string")
+        link.tools = [{link: link.tools,
+                       text: link.tools}];
+
+    link.tools = link.tools.map(function(l,i) {return new HyperLink(l);});
+
+    return this.links.push(link) - 1;
+}
+
+Graph.prototype.delnode = function(node)  {
+    /*
+     * Delete a node and all links to and from it
+     */
+    var self = this;
+    var idx = this.nodes.indexOf(node);
+    if(idx < 0)
+        return -1;
+    this.nodes.splice(idx, 1);
+    // remove links
+    this.links.filter(function(link, i) {
+        return link.source == node || link.target == node;
+    }).map(function(link){self.dellink(link);});
+    return idx;
+}
+
+Graph.prototype.dellink = function(link) {
+    /*
+     * Delete a link
+     */
+    var idx = this.links.indexOf(link);
+    if(idx < 0)
+        return -1;
+    this.links.splice(idx, 1);
+    this.calculate_weights(link, true);
+    return idx;
 }
 
 Graph.prototype.calculate_weights = function(link, del=false) {
@@ -241,116 +443,13 @@ Graph.prototype.calculate_weights = function(link, del=false) {
     return weight;
 }
 
-Graph.prototype.addnode = function(node) {
-    /* Add a node to the graph.
-     *
-     * node: {name, description}
-     */
-    if(node.name == undefined)
-        return -1;
-    var nodelist = this.nodes.map(function(d){return d.name;});
-    if(nodelist.indexOf(node.name) >= 0)
-        return nodelist.indexOf(node.name);
-
-    var th = Math.random() * 2 * PI;
-    node.x= (1+Math.sin(th))*width/2;
-    node.y= (1+Math.cos(th))*width/2;
-    node.rx= Math.max(30, node.name.length*4);
-    node.ry= 30;
-    return this.nodes.push(node) - 1;
-}
-
-Graph.prototype.addlink = function(link) {
-    /*
-     * Add a link to the graph.
-     * Returns the index of the added link, or -1 upon failure.
-     * By convention, if link.source or link.target are
-     * strings, then a node with that name is added.
-     *
-     * link: {source, target, flow, description,
-     *        reference, notes, tools, type, links, weight}
-     */
-    link = new Link(link);
-    // Add nodes
-    if(link.source == undefined)
-        return -1;
-
-    var ids = link.get_nodeids(),
-        src = ids[0],
-        trg = ids[1];
-    if (typeof link.source == "string")
-        src = this.addnode({name: link.source});
-    if (typeof link.target == "string")
-        trg = this.addnode({name: link.target});
-
-    message(LOG_DEBUG, "Graph: addlink: ", link.source, link.target, src, trg);
-
-    // Turn around when flow is negative
-    if(link.flow == -1) {
-        var tmp = src;
-        src=trg;
-        trg=tmp;
-        link.flow = 1;
-    }
-
-    link.source = src;
-    link.target = trg;
-
-    // Correct weights
-    var weight = this.calculate_weights(link);
-    if(weight < 0) // skip
-        return -1;
-    link.weight = weight;
-
-    // Parse references if text
-    if(typeof link.reference == "string") {
-        var refs = link.reference.split(";");
-        var links = link.links.split(";");
-        link.reference = 
-            refs.map(function(ref, i) {
-                return {link: links[i], text: ref};
-            });
-        link.links = links.slice(refs.length);
-    }
-
-    return this.links.push(link) - 1;
-}
-
-Graph.prototype.delnode = function(node)  {
-    /*
-     * Delete a node and all links to and from it
-     */
-    var self = this;
-    var idx = this.nodes.indexOf(node);
-    if(idx < 0)
-        return -1;
-    this.nodes.splice(idx, 1);
-    // remove links
-    this.links.filter(function(link, i) {
-        return link.source == node || link.target == node;
-    }).map(function(link){self.dellink(link);});
-    return idx;
-}
-
-Graph.prototype.dellink = function(link) {
-    /*
-     * Delete a link
-     */
-    var idx = this.links.indexOf(link);
-    if(idx < 0)
-        return -1;
-    this.links.splice(idx, 1);
-    this.calculate_weights(link, true);
-    return idx;
-}
-
 Graph.prototype.tojson = function() {
     /*
      * Export the graph to json
      */
     var skippers = "x y rx ry index weight px py fixed conf nodelist linklist".split(" ");
     return JSON.stringify(
-        graph,
+        this,
         function(key, value) {
             if(skippers.indexOf(key) >= 0)
                 return undefined;
@@ -361,21 +460,40 @@ Graph.prototype.tojson = function() {
         }, true);
 }
 
-
 /*
- * VGraph: view/edit graph info
+ * VGraph: Generate HTML representations of a Graph to 
+ * visualise and edit (in a form) its contents. 
+ *
+ * Public methods:
+ *  - VGraph(graph, id, callbacks):   constructor
+ *  - register_callback(callback):   define a function to be
+ *    called each time data in the graph is modified.
+ *  - nodehtml(node, edit):   node view/edit HTML
+ *  - linkhtml(link, edit):   link view/edit HTML
+ *  - formdata(accessors):   retrieve data from the form
+ *  - node_fromdata():   create a node from the form data
+ *  - link_fromdata():   create a link from the form data
+ *  - show(data, type, edit):  show/edit a node/link
  */
 
 var VGraph = function(graph, id, callbacks = []){
     /*
-     * Expects to find a div#metadata and div#toolbox within div#id.
+     * Create a VGraph of the specified graph to be shown in
+     * the div $(id).
      *
+     * Arguments:
+     *   - graph:  the Graph
+     *   - id:  id of the container div
+     *   - callbacks: list of functions to be called when
+     *     data in the graph is modified.
+     *
+     * Note: VGraph xpects to find a div#metadata and
+     *   div#toolbox within div#id. 
      */
     this.graph = graph;
     this.id = id;
     this.tbox_id = this.id + " #toolbox";
     this.data_id = this.id + " #metadata";
-    // List of functions to call upon update of graph data
     this.update_callbacks = callbacks;
     this.show();
 }
@@ -385,128 +503,6 @@ VGraph.prototype.register_callback = function(callback) {
      * Register a function to be called when data is updated
      */
     this.update_callbacks.push(callback);
-}
-
-VGraph.prototype.update = function() {
-    /*
-     * Execute all callbacks
-     */
-    this.update_callbacks.forEach(function(fun){return fun();});
-}
-
-VGraph.prototype.field = function(name, value, type, edit, derived=false, title=null, style="") {
-    /*
-     * Generate an HTML representation of a field, either
-     * to display, or to edit (when edit is true).
-     *
-     * Arguments:
-     *   name (string): name of the field
-     *   value (various): value of the field
-     *   type (string): type of the field, see below
-     *   edit (boolean): activates the editing interface
-     *   derived (boolean): false if the field is editable
-     *   title (string): name of the field to use instead of name ("" for no title)
-     *   style (string): css class for to the TD
-     *
-     * Notes:
-     *   Field types. Valid field types are:
-     *     - text: plain text field
-     *     - node: one of the graph's nodes
-     *     - linkflow: flow of a link (see the graph class)
-     *     - linktype: type of link (see the graph class)
-     *     - reference: references of a link (see the graph class)
-     *
-     *
-     * TODO: use a common API for references and links, to match formdata().
-     */
-    var self = this;
-    if(edit && derived)
-        return "";
-    if(!edit && value == "")
-        return "";
-    if(edit && value == undefined)
-        value = "";
-
-    if(title === null) title = capitalize(name);
-    var retstr = "<tr>";
-    if(title != "")
-        retstr += "<td class='"+style+"'>"+title+":</td><td>";
-    else
-        retstr += "<td colspan='2'>";
-    if(edit) {
-        // edit
-        if(type == "textarea")
-            retstr += "<textarea rows='5' cols='20' name='"+name+"'>"+value+"</textarea>";
-
-        else if(type == "node")
-            retstr += "<select name='"+name+"'>" +
-            this.graph.nodes.map(function(node, i) {
-                var selected = "";
-                if(node.name == value) selected = "selected";
-                return "<option value="+i+" "+selected+">"+node.name+"</option>";
-            }) + "</select>";
-
-        else if(type == "linkflow")
-            retstr += "<select name='"+name+"'>" +
-            FLOW_DESCRIPTION.map(function(flow, i) {
-                var selected = "";
-                if(i == value) selected = "selected";
-                return "<option value="+i+" "+selected+">"+flow+"</option>";
-            }) + "</select>";
-
-        else if(type == "linktype")
-            retstr += "<select name='"+name+"'>" +
-            TYPE_DESCRIPTION.map(function(type, i) {
-                var selected = "";
-                if(i == value) selected = "selected";
-                return "<option value="+i+" "+selected+">"+type+"</option>";
-            }) + "</select>";
-
-        else if(type == "links") {
-            retstr += "</td></tr><tr><td colspan='2'><table>";
-            if(value == "")
-                value = [];
-            retstr += value.concat("").map(function(link, i) {
-                return self.field(["",name,i].join("_"), link, "text", true, false, (i+1), "subfield");
-            }).join("") + "</table>";
-        }
-
-        else if(type == "reference") { // value is [{text, link}, ...]
-            retstr += "</td></tr><tr><td colspan='2'><table>";
-            if(value == "")
-                value = [];
-            retstr += value.concat({}).map(function(ref, i) {
-                return self.field(["",name,i,"text"].join("_"), ref.text, "text", true, false, (i+1)+".Text", "subfield") +
-                       self.field(["",name,i,"link"].join("_"), ref.link, "text", true, false, (i+1)+".Link", "subfield");
-            }).join("") + "</table>";
-        }
-
-        else // text
-            retstr += "<input type='text' size='20' name='"+name+"' value='"+value+"' />";
-
-    } else {
-        // display
-        if(type == "reference" && value)
-            retstr += value.map(function(ref, i) {
-                return "<a href='http://"+ref.link+"'>"+ref.text+"</a>"
-            }).join("<br/>");
-
-        else if(type == "links" && value)
-            retstr += value.map(function(link, i) {
-                return "<a href='http://"+link+"'>"+link+"</a>"
-            }).join("<br/>");
-
-        else if(type == "linkflow")
-            retstr += FLOW_DESCRIPTION[value];
-
-        else if(type == "linktype")
-            retstr += TYPE_DESCRIPTION[value];
-
-        else // text & others
-            retstr += value;
-    }
-    retstr += "</td>";
-    return retstr;
 }
 
 VGraph.prototype.nodehtml = function(node, edit=false) {
@@ -550,9 +546,9 @@ VGraph.prototype.linkhtml = function(link, edit=false) {
         this.field("description", link.description, "textarea", edit, false, "Descr.") +
         this.field("flow", link.flow, "linkflow", edit) +
         this.field("type", link.type, "linktype", edit) +
-        this.field("tools", link.tools, "textarea", edit) +
-        this.field("reference", link.reference, "reference", edit, false, "Refs") +
-        this.field("links", link.links, "links", edit) +
+        this.field("tools", link.tools, "hyperlink", edit) +
+        this.field("reference", link.reference, "hyperlink", edit, false, "Refs") +
+        this.field("links", link.links, "hyperlink", edit) +
         this.field("notes", link.notes, "textarea", edit) +
         "</table>";
     return linkstr;
@@ -633,6 +629,163 @@ VGraph.prototype.link_fromdata = function() {
     link.source = this.graph.nodes[link.source];
     link.target = this.graph.nodes[link.target];
     return link;
+}
+
+VGraph.prototype.show = function(d, type, edit=false) {
+    /*
+     * Display metadata for node/link =d=, and activate
+     * the pertinent tools in the toolbox.
+     *
+     * Arguments:
+     *     - d (object): node/link to display
+     *     - type (string): "node" or "link"
+     *     - edit (boolean): display or edit
+     */
+    var self = this;
+    $(this.tbox_id+" .item").hide(); // hide all
+    if(type == "node") {
+        $(this.data_id).html(this.nodehtml(d, edit));
+        if(edit) {
+            this.activate_tool(".cancel", "Cancel", function(){self.show(d,"node");});
+            this.activate_tool(".submit", "Save",   function(){self.node_update(d);});
+        }else{
+            this.activate_tool(".add",  "Add Node",	function(){self.node_new();});
+            this.activate_tool(".edit", "Edit Node",	function(){self.node_edit(d);});
+            this.activate_tool(".delete", "Delete Node",function(){self.node_delete(d);});
+            this.activate_tool(".link", "Link Node", 	function(){self.link_new(d);});
+        }
+    }else if(type == "link") {
+        $(this.data_id).html(this.linkhtml(d, edit));
+        if(edit) {
+            this.activate_tool(".cancel", "Cancel", function(){self.show(d,"link");});
+            this.activate_tool(".submit", "Save",   function(){self.link_update(d);});
+        }else{
+            this.activate_tool(".add",  "Add Link",	function(){self.link_new();});
+            this.activate_tool(".edit", "Edit Link",	function(){self.link_edit(d);});
+            this.activate_tool(".delete", "Delete Link",function(){self.link_delete(d);});
+        }
+    }else{
+        $(this.data_id).html("");
+        this.activate_tool(".add",  "Add Node",  function(){self.node_new();});
+    }
+    // Adjust box height
+    $(this.data_id).height( "auto" );
+    var Hdata    = $(this.data_id).outerHeight(),
+        Htoolbox = $(this.tbox_id).outerHeight(),
+        Hbox     = Hdata + Htoolbox;
+    if(Hbox > height) { // cap to svg height
+        Hbox = height;
+        $(this.data_id).height( Hbox - Htoolbox );
+    }
+    $(this.id).animate({
+        height: Hbox
+    });
+}
+
+VGraph.prototype.update = function() {
+    /*
+     * Execute all callbacks
+     */
+    this.update_callbacks.forEach(function(fun){return fun();});
+}
+
+VGraph.prototype.field = function(name, value, type, edit, derived=false, title=null, style="") {
+    /*
+     * Generate an HTML representation of a field, either
+     * to display, or to edit (when edit is true).
+     *
+     * Arguments:
+     *   name (string): name of the field
+     *   value (various): value of the field
+     *   type (string): type of the field, see below
+     *   edit (boolean): activates the editing interface
+     *   derived (boolean): false if the field is editable
+     *   title (string): name of the field to use instead of name ("" for no title)
+     *   style (string): css class for to the TD
+     *
+     * Notes:
+     *   Field types. Valid field types are:
+     *     - text: plain text field
+     *     - node: one of the graph's nodes
+     *     - linkflow: flow of a link (see Link)
+     *     - linktype: type of link (see Link)
+     *     - hyperlink: list of hyperlinks (see Link)
+     *
+     */
+    var self = this;
+    if(edit && derived)
+        return "";
+    if(!edit && value == "")
+        return "";
+    if(edit && value == undefined)
+        value = "";
+
+    if(title === null) title = capitalize(name);
+    var retstr = "<tr>";
+    if(title != "")
+        retstr += "<td class='"+style+"'>"+title+":</td><td>";
+    else
+        retstr += "<td colspan='2'>";
+    if(edit) {
+        // edit
+        if(type == "textarea")
+            retstr += "<textarea rows='5' cols='20' name='"+name+"'>"+value+"</textarea>";
+
+        else if(type == "node")
+            retstr += "<select name='"+name+"'>" +
+            this.graph.nodes.map(function(node, i) {
+                var selected = "";
+                if(node.name == value) selected = "selected";
+                return "<option value="+i+" "+selected+">"+node.name+"</option>";
+            }) + "</select>";
+
+        else if(type == "linkflow")
+            retstr += "<select name='"+name+"'>" +
+            FLOW_DESCRIPTION.map(function(flow, i) {
+                var selected = "";
+                if(i == value) selected = "selected";
+                return "<option value="+i+" "+selected+">"+flow+"</option>";
+            }) + "</select>";
+
+        else if(type == "linktype")
+            retstr += "<select name='"+name+"'>" +
+            TYPE_DESCRIPTION.map(function(type, i) {
+                var selected = "";
+                if(i == value) selected = "selected";
+                return "<option value="+i+" "+selected+">"+type+"</option>";
+            }) + "</select>";
+
+        else if(type == "hyperlink") { // value is [{text, link}, ...]
+            retstr += "</td></tr><tr><td colspan='2'><table>";
+            if(value == "")
+                value = [];
+            retstr += value.concat({}).map(function(ref, i) {
+                return self.field(["",name,i,"text"].join("_"), ref.text, "text", true, false, (i+1)+".Text", "subfield") +
+                       self.field(["",name,i,"link"].join("_"), ref.link, "text", true, false, (i+1)+".Link", "subfield");
+            }).join("") + "</table>";
+        }
+
+        else // text
+            retstr += "<input type='text' size='20' name='"+name+"' value='"+value+"' />";
+
+    } else {
+        // display
+        if(type == "hyperlink" && value)
+            retstr += value.map(function(ref, i) {
+                return "<a href='http://"+ref.link+"'>"+ref.text+"</a>"
+            }).join("<br/>");
+
+        else if(type == "linkflow")
+            retstr += FLOW_DESCRIPTION[value];
+
+        else if(type == "linktype")
+            retstr += TYPE_DESCRIPTION[value];
+
+        else // text & others
+            retstr += value;
+    }
+    retstr += "</td>";
+    return retstr;
 }
 
 /* VGraph callbacks */
@@ -726,63 +879,45 @@ VGraph.prototype.link_delete = function(link) {
     return retvalue;
 }
 
-VGraph.prototype.show = function(d, type, edit=false) {
-    /*
-     * Display metadata for node/link =d=, and activate
-     * the pertinent tools in the toolbox.
-     *
-     * Arguments:
-     *     - d (object): node/link to display
-     *     - type (string): "node" or "link"
-     *     - edit (boolean): display or edit
-     */
-    var self = this;
-    $(this.tbox_id+" .item").hide(); // hide all
-    if(type == "node") {
-        $(this.data_id).html(this.nodehtml(d, edit));
-        if(edit) {
-            this.activate_tool(".cancel", "Cancel", function(){self.show();});
-            this.activate_tool(".submit", "Save",   function(){self.node_update(d);});
-        }else{
-            this.activate_tool(".add",  "Add Node",	function(){self.node_new();});
-            this.activate_tool(".edit", "Edit Node",	function(){self.node_edit(d);});
-            this.activate_tool(".delete", "Delete Node",function(){self.node_delete(d);});
-            this.activate_tool(".link", "Link Node", 	function(){self.link_new(d);});
-        }
-    }else if(type == "link") {
-        $(this.data_id).html(this.linkhtml(d, edit));
-        if(edit) {
-            this.activate_tool(".cancel", "Cancel", function(){self.show();});
-            this.activate_tool(".submit", "Save",   function(){self.link_update(d);});
-        }else{
-            this.activate_tool(".add",  "Add Link",	function(){self.link_new();});
-            this.activate_tool(".edit", "Edit Link",	function(){self.link_edit(d);});
-            this.activate_tool(".delete", "Delete Link",function(){self.link_delete(d);});
-        }
-    }else{
-        $(this.data_id).html("");
-        this.activate_tool(".add",  "Add Node",  function(){self.node_new();});
-    }
-    // Adjust box height
-    $(this.data_id).height( "auto" );
-    var Hdata    = $(this.data_id).outerHeight(),
-        Htoolbox = $(this.tbox_id).outerHeight(),
-        Hbox     = Hdata + Htoolbox;
-    if(Hbox > height) { // cap to svg height
-        Hbox = height;
-        $(this.data_id).height( Hbox - Htoolbox );
-    }
-    $(this.id).animate({
-        height: Hbox
-    });
-}
-
-/* GraphLayout */
+/*
+ * GraphLayout: A D3.js-based visualisation of a graph.
+ * For more information see documentation of the D3 force
+ * layout. Data for the graph is loaded from an input file.
+ * 
+ * Public methods:
+ *  - Graph(id, filein, type):   constructor
+ *  - init():  initialise the layout
+ *  - update():  update visualisation upon data change
+ *  - refresh():  re-optimise node locations
+ *  - release():  release all nodes that are fixed
+ *  - on(event, callback):  register a callback for an event.
+ *  - locations(locations, scale): set the positions of nodes.
+ */
 var GraphLayout = function(id, filein, type="json") {
     /*
      * Construct a datagraph in the specified div ($("#id")),
      * and populate it with data from the =filein= input file
-     * of type =type=.
+     * of type =type=. Supported types are "json" and "csv".
+     *
+     * - JSON:
+     *   - "nodes" is an array of objects, each containing the 
+     *   following keys: name, description (see Node).
+     *   - "links" is an array of objects, each containing the
+     *   following keys: source, target, flow, type, notes, 
+     *   description, reference, tools, links (see Link).
+     * - CSV:
+     *   each line is a link with fields: source, target, flow,
+     *   type, notes, description, reference, tools, links (see
+     *   Link). Due to the simplicity of the csv format, there
+     *   are some differences with respect to the JSON format.
+     *   The reference, links and tools columns can contain a
+     *   semicolon-separated list of strings. In the case of
+     *   reference, all those strings are used as the "text"
+     *   field of as many HyperLink instances; the "link"
+     *   field of these is taken from the first entries in
+     *   the links column. The remaining entries in the link
+     *   column, as well as all entries in the tools column
+     *   act both as "text" and "link".
      */
     this.svg = d3.select(id).append("svg")
         .attr({
@@ -838,6 +973,14 @@ GraphLayout.prototype.init = function() {
     // Create containers (links below nodes)
     this.svg.append("g").attr("id","link-container");
     this.svg.append("g").attr("id","node-container");
+
+    // Initialise node positions to circle
+    this.graph.nodes.forEach(function(node, i) {
+        var th = Math.random() * 2 * PI;
+        node.x = (1+Math.sin(th))*width/2;
+        node.y = (1+Math.cos(th))*width/2;
+    });
+
     var self = this;
     // Create layout
     this.force = d3.layout.force()
@@ -945,7 +1088,9 @@ GraphLayout.prototype.update = function() {
     node.exit().remove();
 
     var nodeEnter = node.enter().append('g')
-        .attr('class', 'node')
+        .attr({
+            class: "node"
+        })
         .on("click", function(d) {
             /*
              * Callback for clicking nodes
@@ -966,8 +1111,14 @@ GraphLayout.prototype.update = function() {
     // Use selection.select to propagate data to children
     node.select('.nodecirc')
         .attr({
-            rx: function(d) {return d.rx;},
-            ry: function(d) {return d.ry;}});
+            rx: function(d) {
+                d.rx = Math.max(30, d.name.length*4);
+                return d.rx;
+            },
+            ry: function(d) {
+                d.ry = 30;
+                return d.ry;
+            }});
 
     nodeEnter.append("text")    // Add text
         .attr({
@@ -996,7 +1147,9 @@ GraphLayout.prototype.release = function() {
 /* Callback functions */
 GraphLayout.prototype.on = function(event, callback) {
     /*
-     * Register and event callback
+     * Register an event callback. Supported events are:
+     *  - node_click:  clicking a node
+     *  - link_click:  clicking a link
      */
     if(event == "node_click")
         this.node_callback = callback;
