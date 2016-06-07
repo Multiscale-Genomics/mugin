@@ -49,6 +49,18 @@ var NFLOWS = 2,
     FLOW_INFORM  = 1,
     FLOW_DESCRIPTION = ["Connect (<->)", "Inform (->)"];
 
+/* Pilots:
+ *  0. Pilot 7.1
+ *  1. Pilot 7.2
+ *  2. Pilot 7.3
+ */
+var NPILOT = 3,
+    PILOT_1 = 1,
+    PILOT_2 = 2,
+    PILOT_3 = 4,
+    PILOTS = [PILOT_1, PILOT_2, PILOT_3],
+    PILOT_DESCRIPTION = ["7.1", "7.2", "7.3"];
+
 /* Logging */
 var LOG_LEVEL = 0,
     LOG_DEBUG = 0,
@@ -195,6 +207,7 @@ Node.prototype.update = function(node2) {
  *   the source material (see HyperLink)
  * - tools:  a list of pertinent available software tools (see
  *   HyperLink).
+ * - project:  the pilot project(s) to which this link applies
  * - links:  a list of relevant web pages (see HyperLink)
  * - weight:  number of links that share the same endpoints
  * - notes:  a free text field for comments
@@ -546,6 +559,7 @@ VGraph.prototype.linkhtml = function(link, edit=false) {
         this.field("description", link.description, "textarea", edit, false, "Descr.") +
         this.field("flow", link.flow, "linkflow", edit) +
         this.field("type", link.type, "linktype", edit) +
+        this.field("pilot", link.pilot, "linkpilot", edit) +
         this.field("tools", link.tools, "hyperlink", edit) +
         this.field("reference", link.reference, "hyperlink", edit, false, "Refs") +
         this.field("links", link.links, "hyperlink", edit) +
@@ -577,6 +591,7 @@ VGraph.prototype.formdata = function(accessors = {}) {
     $(this.id).find("input, textarea, select").each(function() {
         var inputType = this.tagName.toUpperCase() === "INPUT" && this.type.toUpperCase();
         if (inputType !== "BUTTON" && inputType !== "SUBMIT") {
+            if(inputType == "CHECKBOX" && !this.checked) return;
             if(this.name.startsWith("_"))
                 subfields.push(this.name.split("_").splice(1).concat(this.value));
             else {
@@ -626,8 +641,12 @@ VGraph.prototype.link_fromdata = function() {
      * Construct a new link based on the current formdata.
      */
     var link = new Link(this.formdata());
+    // Ensure objects as source/target
     link.source = this.graph.nodes[link.source];
     link.target = this.graph.nodes[link.target];
+    // Deal with pilot projects
+    console.log(link.pilot);
+    link.pilot = link.pilot.reduce(function(a,b) {return parseInt(a) + parseInt(b);});
     return link;
 }
 
@@ -689,7 +708,8 @@ VGraph.prototype.update = function() {
     this.update_callbacks.forEach(function(fun){return fun();});
 }
 
-VGraph.prototype.field = function(name, value, type, edit, derived=false, title=null, style="") {
+VGraph.prototype.field = function(name, value, type, edit,
+                                  derived=false, title=null, style="") {
     /*
      * Generate an HTML representation of a field, either
      * to display, or to edit (when edit is true).
@@ -709,6 +729,7 @@ VGraph.prototype.field = function(name, value, type, edit, derived=false, title=
      *     - node: one of the graph's nodes
      *     - linkflow: flow of a link (see Link)
      *     - linktype: type of link (see Link)
+     *     - linkpilot: pilot project(s) to which link applies (see Link)
      *     - hyperlink: list of hyperlinks (see Link)
      *
      */
@@ -755,6 +776,14 @@ VGraph.prototype.field = function(name, value, type, edit, derived=false, title=
                 return "<option value="+i+" "+selected+">"+type+"</option>";
             }) + "</select>";
 
+        else if(type == "linkpilot")
+            retstr += PILOTS.map(function(pilot, i) {
+                var checked = "";
+                var fname = ["",name,i].join("_");
+                if(pilot & value) checked = "checked";
+                return "<label><input type='checkbox' name='"+fname+"' value="+pilot+" "+checked+" />"+PILOT_DESCRIPTION[i]+"</label>";
+            }).join("<br />");
+        
         else if(type == "hyperlink") { // value is [{text, link}, ...]
             retstr += "</td></tr><tr><td colspan='2'><table>";
             if(value == "")
@@ -781,6 +810,11 @@ VGraph.prototype.field = function(name, value, type, edit, derived=false, title=
         else if(type == "linktype")
             retstr += TYPE_DESCRIPTION[value];
 
+        else if(type == "linkpilot")
+            retstr += PILOTS.map(function(pilot, i) {
+                if(pilot & value) return PILOT_DESCRIPTION[i];
+            }).clean(undefined).join(",");
+        
         else // text & others
             retstr += value;
     }
@@ -877,6 +911,48 @@ VGraph.prototype.link_delete = function(link) {
     this.update();
     this.show();
     return retvalue;
+}
+
+function filter(graph, criteria, negate = false) {
+    /*
+     *
+     */
+    graph.links.forEach(function(link){link.hidden = true;});
+    criteria.forEach(function(criterium, i) {
+        if(negate)
+            criterium = function(link,i){return !criterium(link);};
+        graph.links.filter(criterium)
+            .forEach(function(link, i){link.hidden = false;});
+    });
+}
+
+function filters(id, layout) {
+    $(id).html(
+        "" +
+            PILOTS.map(function(pilot,i) {
+                return "<label><input type='checkbox' alt='pilot' value='"+pilot+"' checked />"+PILOT_DESCRIPTION[i]+"</label>";
+            }).join("<br/>") +
+            
+            TYPE_DESCRIPTION.map(function(type, i) {
+                return "<label><input type='checkbox' alt='type' value='"+i+"' checked />"+TYPE_DESCRIPTION[i]+"</label>";
+            }).join("<br/>") +
+            
+        "<input type='button' value='Update' id='update' />");
+    
+    $(id + " " + "#update").click(function() {
+        var criteria = [];
+        $(id).find("input").each(function() {
+            var inputType = this.type.toUpperCase();
+            if(inputType == "BUTTON") return;
+            if(inputType == "CHECKBOX" && !this.checked) return;
+            var f = this.alt, v = this.value;
+            criteria.push(function(link) {
+                return link[f] == v;
+            });
+        });
+        filter(layout.graph, criteria);
+        layout.update();
+    });
 }
 
 /*
@@ -1050,7 +1126,6 @@ GraphLayout.prototype.update = function() {
 
     link.exit().remove();
 
-    //var linkEnter = link.enter().append('path')
     var linkEnter = link.enter().append('g')
         .attr("class", "linkg")
         .on("click", function(d) {
@@ -1061,6 +1136,12 @@ GraphLayout.prototype.update = function() {
             if(self.link_callback)
                 self.link_callback(d);
         });
+    
+    // Filtering
+    link.attr("class", function(d) {
+        if(d.hidden) return "linkg hidden";
+        else return "linkg";
+    });
     
     linkEnter.append("path") // Add invisible path
         .attr('class', 'link hid');

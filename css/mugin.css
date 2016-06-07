@@ -75,8 +75,12 @@ th.maybe {
     padding-left: 5%;
 }
 
-#metadata input, #metadata textarea, #metadata select {
+#metadata input, #metadata textarea, #metadata select, #metadata label {
     width: 100%;
+}
+
+#metadata label input {
+    width: auto;
 }
 
 #toolbox {
@@ -120,6 +124,10 @@ th.maybe {
 
 .node:hover {
     stroke-width: 5px;
+}
+
+.hidden {
+    display: none;
 }
 
 .link {
