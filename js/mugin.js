@@ -14,14 +14,15 @@
  * v0.4 160530
  * v0.5 160601
  * v0.5.1 160613
+ * v0.5.2 160613
  * TODO: 
  *  1. directional links DONE v0.2
  *  2. double links      DONE v0.2
  *  3. improved metadata DONE v0.3
  *  4. JSON input/output DONE v0.4
  *  5. editable metadata DONE v0.5
- *  5a. filtering DONE v0.5.1
- *  5b. commit json to php
+ *  5a. filtering        DONE v0.5.1
+ *  5b. submit json      DONE v0.5.2
  *  6. graph bidimensional sorting
  *  7. multiple entries per link
  *  ...
@@ -119,7 +120,7 @@ function message() {
     var args = Array.prototype.slice.call(arguments, 1);
     args = [LOG_MESSAGE[level]+":"].concat(args);
     if(level >= 3)
-        window.alert(args.join(","));
+        window.alert(args.join(" "));
     if(level >= LOG_LEVEL)
         console.log.apply(console, args);
 }
@@ -458,7 +459,7 @@ Graph.prototype.calculate_weights = function(link, del=false) {
     return weight;
 }
 
-Graph.prototype.tojson = function() {
+Graph.prototype.to_json = function() {
     /*
      * Export the graph to json
      */
@@ -493,7 +494,6 @@ Graph.prototype.filter_links = function(criteria, callback, negate = false) {
      *       matches links for which criteria return true or false.
      *
      */
-    console.log(this.links.filter);
     criteria.forEach(function(criterium, c_index) {
         if(negate)
             criterium = function(link, l_index){return !criterium(link);};
@@ -965,10 +965,8 @@ function make_filters(id, layout) {
             TYPE_DESCRIPTION.map(function(type, i) {
                 return "<label><input type='checkbox' alt='type' value='"+i+"' checked />"+TYPE_DESCRIPTION[i]+"</label>";
             }).join("<br/>") +
-            "<br/>"+            
-        "<input type='button' value='Update' id='update' />");
-    
-    $(id + " " + "#update").click(function() {
+            "<br/>");
+    $(id).find("input").click(function() {
         var criteria = [];
         $(id).find("input").each(function() {
             var inputType = this.type.toUpperCase();
@@ -1058,9 +1056,11 @@ var GraphLayout = function(id, filein, type="json") {
     this.make_markers();
     this.make_legend();
     this.tools = [];
-    this.register_tool(function() {circle(self);}, "images/circle.svg");
-    this.register_tool(function() {hexagon(self);}, "images/hexagon.svg");
-    this.register_tool(function() {self.release();}, "images/release.svg");
+    this.modified = false;
+    this.register_tool(function() {submit_json(self.graph.to_json());}, "images/cloudup.svg", "Save changes to server");
+    this.register_tool(function() {circle(self);}, "images/circle.svg", "Arrange nodes in a circle");
+    this.register_tool(function() {hexagon(self);}, "images/hexagon.svg", "Arrange nodes in a hexagon");
+    this.register_tool(function() {self.release();}, "images/release.svg", "Release all fixed nodes");
     
     this.node_callback = null;
     this.link_callback = null;
@@ -1385,14 +1385,15 @@ GraphLayout.prototype.locations = function(locations, scale) {
 }
 
 /* Other UI functions */
-GraphLayout.prototype.register_tool = function(callback, icon, update=true) {
+GraphLayout.prototype.register_tool = function(callback, icon, alt, update=true) {
     /*
      * Register a tool in the toolbox, providing an icon
      * to represent the tool and callback to call on click.
      */
     this.tools.push({
         callback: callback,
-        icon: icon
+        icon: icon,
+        alt: alt
     });
     if(update)
         this.update_toolbox();
@@ -1428,7 +1429,8 @@ GraphLayout.prototype.update_toolbox = function() {
             width: TOOL_SIZE,
             height: TOOL_SIZE,
         });
-
+    tool.append("title")
+        .text(function(d,i){return d.alt;});
 }
 
 GraphLayout.prototype.make_legend = function() {
@@ -1568,3 +1570,19 @@ function circle(layout, random = false) {
     layout.locations(locations, scale);
 }
 
+/* Submitting */
+function submit_json(graph_json) {
+    $.ajax({
+        url: "mugin_submit.php",
+        type: 'POST',
+        contentType:'application/json',
+        data: graph_json,
+        dataType:'json',
+        success: function(data){
+            message(LOG_INFO, "Data saved correctly.");
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            message(LOG_ERROR, "Error saving data! ("+xhr.status+")");
+        }
+    });
+}
