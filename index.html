@@ -64,6 +64,8 @@
               vg.register_callback(function(){g.update();});
               g.on("node_click", function(node){vg.show(node, "node");});
               g.on("link_click", function(link){vg.show(link, "link");});
+              make_filters("#filters", g);
+              g.register_tool(function(){$("#filter").toggle();}, "images/funnel.svg");
             </script>
 	  </div>
 	  <div id="debug"></div>

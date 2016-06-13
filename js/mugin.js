@@ -13,12 +13,14 @@
  * v0.3 160525
  * v0.4 160530
  * v0.5 160601
+ * v0.5.1 160613
  * TODO: 
  *  1. directional links DONE v0.2
  *  2. double links      DONE v0.2
  *  3. improved metadata DONE v0.3
  *  4. JSON input/output DONE v0.4
  *  5. editable metadata DONE v0.5
+ *  5a. filtering DONE v0.5.1
  *  5b. commit json to php
  *  6. graph bidimensional sorting
  *  7. multiple entries per link
@@ -473,6 +475,32 @@ Graph.prototype.tojson = function() {
         }, true);
 }
 
+Graph.prototype.filter_links = function(criteria, callback, negate = false) {
+    /*
+     * Call =callback= on all links that match ANY of a
+     * series of =criteria=.
+     *
+     * Arguments
+     *     - criteria: list of functions with signature:
+     *          fun(link, i, links)
+     *       where link is a Link, i is its index in the list of
+     *       links; fun returns boolean. 
+     *     - callback: function to call, with signature:
+     *          fun(link, i, filtered_links)
+     *       where link is a Link, i is its index in the list of
+     *       selected link (filtered_links)
+     *     - negate: boolean to define whether filter_links
+     *       matches links for which criteria return true or false.
+     *
+     */
+    console.log(this.links.filter);
+    criteria.forEach(function(criterium, c_index) {
+        if(negate)
+            criterium = function(link, l_index){return !criterium(link);};
+        this.links.filter(criterium).forEach(callback);
+    }, this);
+}
+
 /*
  * VGraph: Generate HTML representations of a Graph to 
  * visualise and edit (in a form) its contents. 
@@ -913,30 +941,31 @@ VGraph.prototype.link_delete = function(link) {
     return retvalue;
 }
 
-function filter(graph, criteria, negate = false) {
+/* Filtering */
+
+function filter_callback(graph, criteria) {
     /*
-     *
+     * Callback for filtering
      */
     graph.links.forEach(function(link){link.hidden = true;});
-    criteria.forEach(function(criterium, i) {
-        if(negate)
-            criterium = function(link,i){return !criterium(link);};
-        graph.links.filter(criterium)
-            .forEach(function(link, i){link.hidden = false;});
-    });
+    graph.filter_links(criteria, function(link) {link.hidden = false;});
 }
 
-function filters(id, layout) {
+function make_filters(id, layout) {
+    /*
+     * Construct filters GUI in div#id to act on GraphLayout layout.
+     *
+     */
     $(id).html(
         "" +
             PILOTS.map(function(pilot,i) {
                 return "<label><input type='checkbox' alt='pilot' value='"+pilot+"' checked />"+PILOT_DESCRIPTION[i]+"</label>";
             }).join("<br/>") +
-            
+            "<br/>"+
             TYPE_DESCRIPTION.map(function(type, i) {
                 return "<label><input type='checkbox' alt='type' value='"+i+"' checked />"+TYPE_DESCRIPTION[i]+"</label>";
             }).join("<br/>") +
-            
+            "<br/>"+            
         "<input type='button' value='Update' id='update' />");
     
     $(id + " " + "#update").click(function() {
@@ -950,7 +979,7 @@ function filters(id, layout) {
                 return link[f] == v;
             });
         });
-        filter(layout.graph, criteria);
+        filter_callback(layout.graph, criteria);
         layout.update();
     });
 }
@@ -1028,14 +1057,10 @@ var GraphLayout = function(id, filein, type="json") {
 
     this.make_markers();
     this.make_legend();
-    this.make_toolbox(
-        [
-            function() {circle(self);},
-            function() {hexagon(self);},
-            function() {self.release();},
-        ],
-        ["images/circle.svg", "images/hexagon.svg", "images/release.svg"]
-    );
+    this.tools = [];
+    this.register_tool(function() {circle(self);}, "images/circle.svg");
+    this.register_tool(function() {hexagon(self);}, "images/hexagon.svg");
+    this.register_tool(function() {self.release();}, "images/release.svg");
     
     this.node_callback = null;
     this.link_callback = null;
@@ -1050,6 +1075,12 @@ GraphLayout.prototype.init = function() {
     this.svg.append("g").attr("id","link-container");
     this.svg.append("g").attr("id","node-container");
 
+    /* Generate the MIN Toolbox, according to
+     * configuration (see TOOL* variables).
+     */
+    this.svg.append("g").attr("class","toolbox");
+    this.update_toolbox();
+    
     // Initialise node positions to circle
     this.graph.nodes.forEach(function(node, i) {
         var th = Math.random() * 2 * PI;
@@ -1354,23 +1385,37 @@ GraphLayout.prototype.locations = function(locations, scale) {
 }
 
 /* Other UI functions */
-GraphLayout.prototype.make_toolbox = function(functions, icons) {
+GraphLayout.prototype.register_tool = function(callback, icon, update=true) {
     /*
-     * Generate the MIN Toolbox, according to
-     * configuration (see TOOL* variables).
+     * Register a tool in the toolbox, providing an icon
+     * to represent the tool and callback to call on click.
      */
-    var ntool = functions.length;
-    var toolbox = this.svg.append("g").attr("class","toolbox")
+    this.tools.push({
+        callback: callback,
+        icon: icon
+    });
+    if(update)
+        this.update_toolbox();
+}
+
+GraphLayout.prototype.update_toolbox = function() {
+    /*
+     * Update the toolbox
+     *
+     */
+    var ntool = this.tools.length;
+    var tools = this.svg.select(".toolbox")
         .attr("transform","translate("+(width-TOOLmh-TOOL_SIZE*ntool)+","+TOOLmv+")")
-        .selectAll(".tool").data(functions);
-    var tool = toolbox.enter().append("g")
+        .selectAll(".tool").data(this.tools);
+    
+    var tool = tools.enter().append("g")
         .attr({
             class: "tool",
             transform: function(d,i){
                 return "translate("+i*TOOL_SIZE+",0)";}
         })
         .on("click", function (d, i) {
-            d.call();
+            d.callback.call();
         });
     tool.append("rect")
         .attr({
@@ -1379,10 +1424,11 @@ GraphLayout.prototype.make_toolbox = function(functions, icons) {
         })
     tool.append("image")
         .attr({
-            "xlink:href": function(d,i){return icons[i];},
+            "xlink:href": function(d,i){return d.icon;},
             width: TOOL_SIZE,
             height: TOOL_SIZE,
         });
+
 }
 
 GraphLayout.prototype.make_legend = function() {

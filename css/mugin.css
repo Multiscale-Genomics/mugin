@@ -30,6 +30,21 @@ dl.footnotes dd {
     background: rgba(250,250,250,0.5);
 }
 
+#filter {
+    width: 150px;
+    position: absolute;
+    top: 60px;
+    left: 430px;
+    padding: 5px;
+    display: none;
+}
+#filter h3 {
+    margin: 0;
+}
+#filter #update {
+    margin: 5px;
+}
+
 /* metadata */
 #graph_info {
     top: 10px;
