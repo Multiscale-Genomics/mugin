@@ -210,7 +210,7 @@ Node.prototype.update = function(node2) {
  *   the source material (see HyperLink)
  * - tools:  a list of pertinent available software tools (see
  *   HyperLink).
- * - project:  the pilot project(s) to which this link applies
+ * - pilot:  the pilot project(s) to which this link applies
  * - links:  a list of relevant web pages (see HyperLink)
  * - weight:  number of links that share the same endpoints
  * - notes:  a free text field for comments
@@ -242,6 +242,7 @@ var Link = function(object) {
     this.type = undefined;
     this.reference = undefined;
     this.tools = undefined;
+    this.pilot = undefined;
     this.links = undefined;
     this.notes = undefined;
     CopyObject.call(this, object);
@@ -478,14 +479,17 @@ Graph.prototype.to_json = function() {
 
 Graph.prototype.filter_links = function(criteria, callback, negate = false) {
     /*
-     * Call =callback= on all links that match ANY of a
-     * series of =criteria=.
+     * Call =callback= on all links that match specified =criteria=.
      *
      * Arguments
-     *     - criteria: list of functions with signature:
+     *     - criteria: Array of functions with signature:
      *          fun(link, i, links)
      *       where link is a Link, i is its index in the list of
-     *       links; fun returns boolean. 
+     *       links. The functions return boolean values, which are
+     *       combined using AND. criteria can contain nested Arrays
+     *       of boolean-returning functions with the same signature
+     *       as above: these are evaluated first and combined using
+     *       OR: this allows mixing AND and OR logic in the criteria.
      *     - callback: function to call, with signature:
      *          fun(link, i, filtered_links)
      *       where link is a Link, i is its index in the list of
@@ -494,11 +498,29 @@ Graph.prototype.filter_links = function(criteria, callback, negate = false) {
      *       matches links for which criteria return true or false.
      *
      */
-    criteria.forEach(function(criterium, c_index) {
-        if(negate)
-            criterium = function(link, l_index){return !criterium(link);};
-        this.links.filter(criterium).forEach(callback);
-    }, this);
+
+    function criteria_apply(link, l_index, links, criteria, negate, subreducer) {
+        /*
+         * Combine results of criteria on link using subreducer (see Array.reduce).
+         */
+        return criteria.map(function(criterium, c_index, criteria) {
+            var current = undefined;
+            if(Array.isArray(criterium))
+                current = criteria_apply(link, l_index, links,
+                                         criterium, negate, subreducer).reduce(subreducer, false);
+            else
+                current = criterium(link, l_index, links);
+            if(negate)
+                current = !current;
+            return current;
+        });
+    }
+
+    this.links.filter(function(link, l_index) {
+        var crit = criteria_apply(link, l_index, this.links,
+                                  criteria, negate, function(a,b){return a|b;});
+        return crit.reduce(function(a,b){return a&b;}, true);
+    }, this).forEach(callback);
 }
 
 /*
@@ -673,8 +695,8 @@ VGraph.prototype.link_fromdata = function() {
     link.source = this.graph.nodes[link.source];
     link.target = this.graph.nodes[link.target];
     // Deal with pilot projects
-    console.log(link.pilot);
-    link.pilot = link.pilot.reduce(function(a,b) {return parseInt(a) + parseInt(b);});
+    if(link.pilot)
+        link.pilot = link.pilot.reduce(function(a,b) {return parseInt(a) + parseInt(b);});
     return link;
 }
 
@@ -945,10 +967,19 @@ VGraph.prototype.link_delete = function(link) {
 
 function filter_callback(graph, criteria) {
     /*
-     * Callback for filtering
+     * Callback for filtering: hides links matching criteria
      */
     graph.links.forEach(function(link){link.hidden = true;});
     graph.filter_links(criteria, function(link) {link.hidden = false;});
+}
+
+function negate(func) {
+    /*
+     * Negate a function
+     */
+    return function(x) {
+        return !func(x);
+    };
 }
 
 function make_filters(id, layout) {
@@ -965,21 +996,40 @@ function make_filters(id, layout) {
             TYPE_DESCRIPTION.map(function(type, i) {
                 return "<label><input type='checkbox' alt='type' value='"+i+"' checked />"+TYPE_DESCRIPTION[i]+"</label>";
             }).join("<br/>") +
-            "<br/>");
-    $(id).find("input").click(function() {
-        var criteria = [];
-        $(id).find("input").each(function() {
-            var inputType = this.type.toUpperCase();
-            if(inputType == "BUTTON") return;
-            if(inputType == "CHECKBOX" && !this.checked) return;
-            var f = this.alt, v = this.value;
-            criteria.push(function(link) {
-                return link[f] == v;
-            });
+            "<br/>"+
+            "<input type='button' value='Reset' id='reset' />"
+    );
+    var callbacks = {
+        "pilot": function(v) {return function(link){return (link.pilot & parseInt(v)) > 0;};},
+        "type":  function(v) {return function(link){return link.type == v;};},
+    };
+    
+    function reset() {
+        /* Reset all filters to checked */
+        $(id).find("input:checkbox").each(function() {
+            if(this.type.toUpperCase() == "CHECKBOX")
+                this.checked = true;
         });
-        filter_callback(layout.graph, criteria);
+    }
+    function update() {
+        /* Collect filter criteria and apply */
+        var criteria = {};
+        $(id).find("input:checkbox").each(function() {
+            if(this.type.toUpperCase() == "CHECKBOX") {
+                var f = this.alt, v = this.value;
+                if(!criteria[f]) criteria[f] = [];
+                if(this.checked)
+                    criteria[f].push(callbacks[f](v));
+            }
+        });
+        // flatten criteria
+        filter_callback(layout.graph,
+                        Object.keys(criteria).map(function (key) {return criteria[key]}));
         layout.update();
-    });
+    }
+
+    $(id + " #reset").click(reset);
+    $(id).find("input").click(update);
 }
 
 /*
@@ -1542,7 +1592,7 @@ function hexagon(layout) {
         scale=250;
     var locations = {
 	"MNase":	 [a,  d],
-	"RNA-seq":	 [-a, c*0.7],
+	"RNA-seq":	 [-a*1.15, c*0.7],
 	"Histone marks": [0,  c*0.75],
 	"ChIP-seq":	 [b,  c],
 	"Hi-C":		 [a,  a*1.1], 
@@ -1550,7 +1600,7 @@ function hexagon(layout) {
 	"3D chromatin":	 [a,  0],
 	"Models (kbp)":	 [-a, 0],
 	"DNA MD":	 [-a, d],
-	"FISH":		 [-a*0.7, c*0.45]};
+	"FISH":		 [-a*0.65, c*0.45]};
     layout.locations(locations, scale);
 }
 
