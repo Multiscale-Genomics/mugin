@@ -1228,7 +1228,9 @@ GraphLayout.prototype.update = function() {
         .attr('class', 'link hid');
     linkEnter.append("path") // Add visible path
         .attr('class', 'link viz');
+    
     // Use selection.select to propagate data to children
+    link.select('.hid');
     link.select('.viz')
         .attr({
             class: 		function(d) {
