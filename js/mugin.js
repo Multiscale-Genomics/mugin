@@ -66,7 +66,7 @@ var NPILOT = 3,
     PILOT_DESCRIPTION = ["7.1", "7.2", "7.3"];
 
 /* Logging */
-var LOG_LEVEL = 0,
+var LOG_LEVEL = 2,
     LOG_DEBUG = 0,
     LOG_INFO  = 1,
     LOG_WARN  = 2,
@@ -1439,16 +1439,20 @@ GraphLayout.prototype.locations = function(locations, scale) {
 }
 
 /* Other UI functions */
-GraphLayout.prototype.register_tool = function(callback, icon, alt, update=true) {
+GraphLayout.prototype.register_tool = function(callback, icon, alt, position=10000, update=true) {
     /*
      * Register a tool in the toolbox, providing an icon
      * to represent the tool and callback to call on click.
      */
-    this.tools.push({
+    var newtool = {
         callback: callback,
         icon: icon,
         alt: alt
-    });
+    };
+    if(position >= this.tools.length) 
+        this.tools.push(newtool);
+    else
+        this.tools.splice(position, 0, newtool);
     if(update)
         this.update_toolbox();
 }
