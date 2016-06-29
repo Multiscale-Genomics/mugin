@@ -24,8 +24,9 @@
  *  5a. filtering        DONE v0.5.1
  *  5b. submit json      DONE v0.5.2
  *  6. graph bidimensional sorting
+ *  6a. add sortable info to nodes
  *  7. multiple entries per link
- *  ...
+ *  8. save layouts
  */
 
 /* Constants */
@@ -1107,7 +1108,8 @@ var GraphLayout = function(id, filein, type="json") {
     this.make_legend();
     this.tools = [];
     this.modified = false;
-    this.register_tool(function() {submit_json(self.graph.to_json());}, "images/cloudup.svg", "Save changes to server");
+    //this.register_tool(function() {submit_json(self.graph.to_json());}, "images/cloudup.svg", "Save changes to server");
+    this.register_tool(function() {download_json(self.graph.to_json());}, "images/clouddown.svg", "Download changes as JSON");
     this.register_tool(function() {circle(self);}, "images/circle.svg", "Arrange nodes in a circle");
     this.register_tool(function() {hexagon(self);}, "images/hexagon.svg", "Arrange nodes in a hexagon");
     this.register_tool(function() {self.release();}, "images/release.svg", "Release all fixed nodes");
@@ -1637,4 +1639,11 @@ function submit_json(graph_json) {
             message(LOG_ERROR, "Error saving data! ("+xhr.status+")");
         }
     });
+}
+
+function download_json(graph_json) {
+    var data = "text/json;charset=utf-8," + encodeURIComponent(graph_json);
+    $('body').append('<a id="json_link" href="data:' + data + '" download="mugin.json">download JSON</a>')
+    $('#json_link')[0].click();
+    $('#json_link')[0].remove();
 }
