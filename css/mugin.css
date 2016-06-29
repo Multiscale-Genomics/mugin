@@ -45,6 +45,30 @@ dl.footnotes dd {
     margin: 5px;
 }
 
+/* help */
+#help {
+    top: 5px;
+    right: 5px;
+    width: 50%;
+    height: 90%;
+    background: rgba(250,250,250,0.9);
+    overflow: scroll;
+    padding: 10px 0 10px 0;
+}
+#help img {
+    width: 95%;
+}
+#help dd img {
+    width: 2em;
+    margin: 0;
+    vertical-align: bottom;
+    border: 1px solid black;
+}
+
+#help h3 {
+    padding: 0 10px;
+}
+
 /* metadata */
 #graph_info {
     top: 10px;
@@ -185,6 +209,7 @@ th.maybe {
 /* Link,arrow types */
 .done {
     stroke: #33f;
+    color: #33f;
 }
 marker .done {
     fill: #33f;
@@ -192,6 +217,7 @@ marker .done {
 
 .todo {
     stroke: #3d3;
+    color: #3d3;
 }
 marker .todo {
     fill: #3d3;
@@ -199,6 +225,7 @@ marker .todo {
 
 .maybe {
     stroke: #f33;
+    color: #f33;
 }
 marker .maybe {
     fill: #f33;
