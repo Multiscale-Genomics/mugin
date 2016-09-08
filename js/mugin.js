@@ -583,7 +583,6 @@ VGraph.prototype.nodehtml = function(node, edit=false) {
         nodestr += "<tr><th>Node:</th><th>"+node.name+"</th></tr>";
     }
     nodestr +=
-        this.field("name", node.name, "text", edit) +
         this.field("description", node.description, "textarea", edit) +
         this.field("weight", node.weight, "text", edit, true) +
         "</table>";
