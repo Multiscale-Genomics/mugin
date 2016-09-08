@@ -1,14 +1,14 @@
 {"nodes":
- [{"name":"MNase","description":"Nucleosome positioning data"},
-  {"name":"RNA-seq","description":"Gene expression data"},
-  {"name":"Histone marks","description":"ChIP-seq data on epigenetic histone modifications"},
-  {"name":"Hi-C","description":"Chromatin contact matrices"},
-  {"name":"Models (bp)","description":"Physical models of chromatin at the base-pair resolution"},
-  {"name":"3D chromatin","description":"Predicted structures of chromatin"},
-  {"name":"ChIP-seq","description":"Transcription factor binding information"},
-  {"name":"Models (kbp)","description":"Physical models of chromatin at the kilo-base-pair resolution"},
-  {"name":"DNA MD","description":"Molecular Dynamics simulations of DNA and protein-DNA complexes"},
-  {"name":"FISH","description":"Microscopy imaging data using fluorescent probes"}
+ [{"name":"MNase","description":"Information about the position of Nucleosomes along the genome, generally obtained using MNase-seq method, but also using other related techniques."},
+  {"name":"RNA-seq","description":"Data on the relative expression of genes of a particular cell population, obtained by sequencing RNA transcripts extracted from cells."},
+  {"name":"Histone marks","description":"Data on epigenetic histone modifications (in particular methylation of their N-terminal tails), typically obtained using ChIP-seq."},
+  {"name":"Hi-C","description":"Matrices encoding contact probabilities between loci along a portion of a genome, obtained using techniques derived from chromosome conformation capture, such as Hi-C."},
+  {"name":"Models (bp)","description":"Physical models of chromatin at the base-pair resolution."},
+  {"name":"3D chromatin","description":"Three-dimensional structures of chromatin, generally predicted on the basis of contact matrices."},
+  {"name":"ChIP-seq","description":"Information on the genome sequences to which a DNA-binding protein is bound in the cell."},
+  {"name":"Models (kbp)","description":"Physical models of chromatin at the kilo-base-pair resolution."},
+  {"name":"DNA MD","description":"Time-dependent behaviour of DNA and protein-DNA complexes, obtained using Molecular Dynamics with an underlying physical model, giving access to space- and time-resolved information on the complex."},
+  {"name":"FISH","description":"Microscopy imaging data obtained by marking with fluorescent probes specific regions of the genome, used to identify the (relative) location of genome segments in the cell."}
  ],
  "links":
  [{"source":"MNase","target":"RNA-seq","flow":0,"description":"Relate nucleosome dynamics with gene expression","reference":[{"link":"www.ncbi.nlm.nih.gov/pubmed/26818620","text":"Deniz et al., 2016"}],"notes":"Through sequence","tools":[],"type":"1","links":[],"pilot":2},
