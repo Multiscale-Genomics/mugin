@@ -582,6 +582,8 @@ VGraph.prototype.nodehtml = function(node, edit=false) {
     }else{
         nodestr += "<tr><th>Node:</th><th>"+node.name+"</th></tr>";
     }
+    if(edit)
+        nodestr += this.field("name", node.name, "text", edit);
     nodestr +=
         this.field("description", node.description, "textarea", edit) +
         this.field("weight", node.weight, "text", edit, true) +
