@@ -3,10 +3,10 @@
   {"name":"RNA-seq","description":"Data on the relative expression of genes of a particular cell population, obtained by sequencing RNA transcripts extracted from cells."},
   {"name":"Histone marks","description":"Data on epigenetic histone modifications (in particular methylation of their N-terminal tails), typically obtained using ChIP-seq."},
   {"name":"Hi-C","description":"Matrices encoding contact probabilities between loci along a portion of a genome, obtained using techniques derived from chromosome conformation capture, such as Hi-C."},
-  {"name":"Models (bp)","description":"Physical models of chromatin at the base-pair resolution."},
+  {"name":"Models (bp)","description":"Physical models of chromatin at the base-pair resolution, encoding the elastic properties and interactions of naked DNA and nucleosomes, to describe the behaviour of several thousand bps."},
   {"name":"3D chromatin","description":"Three-dimensional structures of chromatin, generally predicted on the basis of contact matrices."},
   {"name":"ChIP-seq","description":"Information on the genome sequences to which a DNA-binding protein is bound in the cell."},
-  {"name":"Models (kbp)","description":"Physical models of chromatin at the kilo-base-pair resolution."},
+  {"name":"Models (kbp)","description":"Physical models of chromatin at the kilo-base-pair resolution, used to describe the epigenetic-dependent mechanics and interactions of chromatin segments of several million bps."},
   {"name":"DNA MD","description":"Time-dependent behaviour of DNA and protein-DNA complexes, obtained using Molecular Dynamics with an underlying physical model, giving access to space- and time-resolved information on the complex."},
   {"name":"FISH","description":"Microscopy imaging data obtained by marking with fluorescent probes specific regions of the genome, used to identify the (relative) location of genome segments in the cell."}
  ],
@@ -37,6 +37,6 @@
   {"source":"Histone marks","target":"Models (kbp)","flow":1,"description":"Parameterise the physical interactions between the 'beads' on the basis of chromatin type","reference":[{"link":"www.ncbi.nlm.nih.gov/pubmed/25092923","text":"Jost et al., 2014"}],"notes":"","tools":[],"type":"1","links":[],"pilot":3},
   {"source":"Models (bp)","target":"Models (kbp)","flow":1,"description":"Parameterisation of interactions & flexibility","reference":[{"link":"","text":""}],"notes":"","tools":[],"type":"2","links":[],"pilot":6},
   {"source":"Models (kbp)","target":"Models (bp)","flow":1,"description":"Back-map bp-resolution coordinates from kbp-resolution coordinates","reference":[{"link":"","text":""}],"notes":"","tools":[],"type":"2","links":[],"pilot":6},
-  {"source":"ChIP-seq","target":"DNA MD","flow":1,"description":"Provide information on the in-vivo consensus sequence of a DNA-binding protein","reference":[{"link":"","text":""}],"notes":"","tools":[{"text":"Various (omictools.com)", "link":"http://omictools.com/motif-discovery-category"}],"type":"0","links":[{"link":"http://jaspar.genereg.net/"}],"pilot":6},
+  {"source":"ChIP-seq","target":"DNA MD","flow":1,"description":"Provide information on the in-vivo consensus sequence of a DNA-binding protein","reference":[{"link":"xxx.com","text":"Bouvier et al., 2009"}],"notes":"","tools":[{"text":"Various (omictools.com)", "link":"http://omictools.com/motif-discovery-category"}],"type":"0","links":[{"link":"http://jaspar.genereg.net/"}],"pilot":6},
   {"source":"Histone marks","target":"DNA MD","flow":1,"description":"Effect of histone marks on chromatin folding","reference":[{"link":"www.ncbi.nlm.nih.gov/pubmed/26192632","text":"Colleparo-Guevara et al., 2015"}],"notes":"","tools":[],"type":"1","links":[],"pilot":6}
  ]}
