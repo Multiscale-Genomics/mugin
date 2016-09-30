@@ -1046,7 +1046,8 @@ function make_filters(id, layout) {
  *  - refresh():  re-optimise node locations
  *  - release():  release all nodes that are fixed
  *  - on(event, callback):  register a callback for an event.
- *  - locations(locations, scale): set the positions of nodes.
+ *  - set_locations(locations, scale): set the positions of nodes.
+ *  - get_locations(): get the positions of nodes.
  */
 var GraphLayout = function(id, filein, type="json") {
     /*
@@ -1110,7 +1111,7 @@ var GraphLayout = function(id, filein, type="json") {
     this.tools = [];
     this.modified = false;
     //this.register_tool(function() {submit_json(self.graph.to_json());}, "images/cloudup.svg", "Save changes to server");
-    this.register_tool(function() {download_json(self.graph.to_json());}, "images/clouddown.svg", "Download changes as JSON");
+    this.register_tool(function() {download_json(self.graph.to_json());}, "images/clouddown.svg", "Download network as JSON");
     this.register_tool(function() {circle(self);}, "images/circle.svg", "Arrange nodes in a circle");
     this.register_tool(function() {hexagon(self);}, "images/hexagon.svg", "Arrange nodes in a hexagon");
     this.register_tool(function() {self.release();}, "images/release.svg", "Release all fixed nodes");
@@ -1401,7 +1402,7 @@ GraphLayout.prototype.patharc = function(link) {
 }
 
 /* Location functions */
-GraphLayout.prototype.locations = function(locations, scale) {
+GraphLayout.prototype.set_locations = function(locations, scale, centered=true) {
     /*
      * Set the location of nodes in the layout by using
      * the information specified in =locations=, scaled
@@ -1409,23 +1410,36 @@ GraphLayout.prototype.locations = function(locations, scale) {
      *
      * Arguments:
      *    - locations: a structure relating node names,
-     *      as strings, to [x, y] pairs, where [0, 0] is
-     *      the center of the svg.
+     *      as strings, to [x, y] pairs.
      *    - scale: a scalar used to multiply coordinates.
+     *    - centered: boolean defining the coordinate system
+     *      for locations:
+     *      true (default): [0,0] is the bottom center of the
+     *      SVG, with y increasing upwards;
+     *      false: [0,0] is the top-left corner of the SVG,
+     *      with y increasing downwards.
      */
     var node = this.svg.selectAll('.node');
     node.attr({
         cx: function(d){d.fixed=true; d.conf=true; return d.x;},
         cy: function(d){return d.y;}
     });
+    var x0 = width/2,
+        y0 = 0.9*height,
+        yd = -1;
+    if(!centered) {
+        x0 = 0,
+        y0 = 0,
+        yd = +1;
+    }
     node.transition().duration(transitionDuration).attr({
         cx: function(d) {
             var loc = locations[d.name];
             if(!loc) {
                 message(LOG_WARN, d.name+" not found in locations!");
-                return width/2;
+                return x0;
             }
-            return scale*loc[0]+width/2;
+            return x0 + scale*loc[0];
         },
         cy: function(d) {
             var loc = locations[d.name];
@@ -1433,10 +1447,32 @@ GraphLayout.prototype.locations = function(locations, scale) {
                 message(LOG_WARN, d.name+" not found in locations!");
                 return height/2;
             }
-            return 0.9*height-scale*loc[1];
+            return y0 + yd * scale*loc[1];
         }})
         .each("end", function(d) {d.px=d.x; d.py=d.y; d.conf=false;});
     this.refresh();
+}
+
+GraphLayout.prototype.get_locations = function() {
+    /*
+     * Get the location of nodes in the layout.
+     *
+     * Returns a structure relating node names,
+     * as strings, to [x, y] pairs, where [0, 0] is
+     * the top-left corner of the SVG.
+     *
+     * Usage:
+     *  g = GraphLayout(...);
+     *  loc = g.get_locations();
+     *  g.set_locations(loc, 1, false);
+     *
+     */
+    var locations = {};
+    var node = this.svg.selectAll('.node');
+    node.each(function(d,i) {
+        locations[d.name] = [d.x, d.y];
+    });
+    return locations;
 }
 
 /* Other UI functions */
@@ -1590,7 +1626,7 @@ function pentagon(layout) {
         "Models (kbp)":	 [-a, 0],
         "DNA MD":	 [-a, d],
         "FISH":		 [-a*0.6, c*0.4]};
-    layout.locations(locations, scale);
+    layout.set_locations(locations, scale);
 }
 
 function hexagon(layout) {
@@ -1610,7 +1646,7 @@ function hexagon(layout) {
 	"Models (kbp)":	 [-a, 0],
 	"DNA MD":	 [-a, d],
 	"FISH":		 [-a*0.65, c*0.45]};
-    layout.locations(locations, scale);
+    layout.set_locations(locations, scale);
 }
 
 function circle(layout, random = false) {
@@ -1626,7 +1662,7 @@ function circle(layout, random = false) {
             Math.cos(th),
             Math.sin(th)+1];
     });
-    layout.locations(locations, scale);
+    layout.set_locations(locations, scale);
 }
 
 /* Submitting */
