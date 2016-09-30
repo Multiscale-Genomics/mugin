@@ -15,6 +15,7 @@
  * v0.5 160601
  * v0.5.1 160613
  * v0.5.2 160613
+ * v0.5.3 160930
  * TODO: 
  *  1. directional links DONE v0.2
  *  2. double links      DONE v0.2
@@ -26,7 +27,7 @@
  *  6. graph bidimensional sorting
  *  6a. add sortable info to nodes
  *  7. multiple entries per link
- *  8. save layouts
+ *  8. save/load layouts DONE v0.5.3
  */
 
 /* Constants */
@@ -1114,7 +1115,9 @@ var GraphLayout = function(id, filein, type="json") {
     this.register_tool(function() {download_json(self.graph.to_json());}, "images/clouddown.svg", "Download network as JSON");
     this.register_tool(function() {circle(self);}, "images/circle.svg", "Arrange nodes in a circle");
     this.register_tool(function() {hexagon(self);}, "images/hexagon.svg", "Arrange nodes in a hexagon");
-    this.register_tool(function() {self.release();}, "images/release.svg", "Release all fixed nodes");
+    this.register_tool(function() {self.release();}, "images/spring.svg", "Release all fixed nodes");
+    this.register_tool(function() {download_json(JSON.stringify(self.get_locations()), "layout.json");}, "images/laydown.svg", "Download node layout");
+    this.register_tool(function() {upload_json(function(layout){self.set_locations(layout, 1, false);});}, "images/layup.svg", "Upload node layout");
     
     this.node_callback = null;
     this.link_callback = null;
@@ -1682,9 +1685,45 @@ function submit_json(graph_json) {
     });
 }
 
-function download_json(graph_json) {
-    var data = "text/json;charset=utf-8," + encodeURIComponent(graph_json);
-    $('body').append('<a id="json_link" href="data:' + data + '" download="mugin.json">download JSON</a>')
+function download_json(json_object, filename="mugin.json") {
+    /*
+     * Calling this function triggers the download of a json file
+     * with the specified name, containing json_object.
+     *
+     */
+    var data = "text/json;charset=utf-8," + encodeURIComponent(json_object);
+    $('body').append('<a id="json_link" href="data:' + data + '" download="'+filename+'">download JSON</a>')
     $('#json_link')[0].click();
     $('#json_link')[0].remove();
+}
+
+function upload_json(callback, extension="json") {
+    /*
+     * Calling this function triggers a file-selection mask to
+     * upload a file with the specified extension using
+     * FileReader, and running the specified with the uploaded
+     * object as argument.
+     *
+     */
+    d3.select('body')
+        .append("input")
+        .attr("type", "file")
+        .attr("accept", "."+extension)
+        .attr("id", "json_upload")
+        .style("display", "none")
+        .on("change", function() {
+            var file = d3.event.target.files[0];
+            if (file) {
+                var reader = new FileReader();
+                reader.onloadend = function(evt) {
+                    // hardcode json parsing in upload
+                    var obj = JSON.parse(evt.target.result);
+                    console.log("UPJ",obj);
+                    callback(obj);
+                    $('#json_upload')[0].remove();
+                };
+                reader.readAsText(file);
+            }
+        });    
+    $('#json_upload')[0].click();
 }
