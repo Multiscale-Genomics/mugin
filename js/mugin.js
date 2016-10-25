@@ -1296,28 +1296,29 @@ GraphLayout.prototype.update = function() {
 
     nodeEnter.append("ellipse") // Add ellipse
         .attr('class', 'nodecirc');
-    // Use selection.select to propagate data to children
-    node.select('.nodecirc')
-        .attr({
-            rx: function(d) {
-                d.rx = Math.max(30, d.name.length*4);
-                return d.rx;
-            },
-            ry: function(d) {
-                d.ry = 30;
-                return d.ry;
-            }});
-
     nodeEnter.append("text")    // Add text
         .attr({
             class: 'nodetxt',
             dy: 5,
             'text-anchor': "middle",
         });
+    
     // Use selection.select to propagate data to children
     node.select('.nodetxt')
         .text(function(d) { return d.name; });
-
+    
+    // Use selection.select to propagate data to children
+    node.select('.nodecirc')
+        .attr({
+            rx: function(d) {
+                d.rx = Math.max(30, d3.select(this.parentNode).select('.nodetxt').node().getBBox().width/1.8);
+                return d.rx;
+            },
+            ry: function(d) {
+                d.ry = 30;
+                return d.ry;
+            }});
+    
     this.force.start();
 }
 
@@ -1627,15 +1628,15 @@ function pentagon(layout) {
         d=0.9,
         scale=400;
     var locations = {
-        "MNase": 	 [0,  d],
+        "MNase-seq": 	 [0,  d],
         "RNA-seq": 	 [-a, c*0.7],
         "Histone marks": [0,  c*0.75],
         "ChIP-seq":	 [b,  c],
         "Hi-C":		 [a,  a], 
-        "Models (bp)": 	 [-b, c],
-        "3D chromatin":	 [a,  0],
-        "Models (kbp)":	 [-a, 0],
-        "DNA MD":	 [-a, d],
+        "Physical models (bp)": 	[-b, c],
+        "Chromatin structure":	 	[a,  0],
+        "Physical models (kbp)":	[-a, 0],
+        "Atomistic MD":	 		[-a, d],
         "FISH":		 [-a*0.6, c*0.4]};
     layout.set_locations(locations, scale);
 }
@@ -1645,17 +1646,17 @@ function hexagon(layout) {
         b=1.0,
         c=1.0,
         d=1.4*c,
-        scale=250;
+        scale=220;
     var locations = {
-	"MNase":	 [a,  d],
-	"RNA-seq":	 [-a*1.15, c*0.7],
+	"MNase-seq":	 [a,  d],
+	"RNA-seq":	 [-a*1.2, c*0.75],
 	"Histone marks": [0,  c*0.75],
 	"ChIP-seq":	 [b,  c],
 	"Hi-C":		 [a,  a*1.1], 
-	"Models (bp)": 	 [-b, c],
-	"3D chromatin":	 [a,  0],
-	"Models (kbp)":	 [-a, 0],
-	"DNA MD":	 [-a, d],
+	"Physical models (bp)": [-b, c],
+	"Chromatin structure":  [a,  0],
+	"Physical models (kbp)":[-a, 0],
+	"Atomistic MD":         [-a, d],
 	"FISH":		 [-a*0.65, c*0.45]};
     layout.set_locations(locations, scale);
 }
