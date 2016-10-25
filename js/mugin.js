@@ -715,30 +715,34 @@ VGraph.prototype.show = function(d, type, edit=false) {
      */
     var self = this;
     $(this.tbox_id+" .item").hide(); // hide all
-    if(type == "node") {
-        $(this.data_id).html(this.nodehtml(d, edit));
-        if(edit) {
-            this.activate_tool(".cancel", "Cancel", function(){self.show(d,"node");});
-            this.activate_tool(".submit", "Save",   function(){self.node_update(d);});
-        }else{
-            this.activate_tool(".add",  "Add Node",	function(){self.node_new();});
-            this.activate_tool(".edit", "Edit Node",	function(){self.node_edit(d);});
-            this.activate_tool(".delete", "Delete Node",function(){self.node_delete(d);});
-            this.activate_tool(".link", "Link Node", 	function(){self.link_new(d);});
-        }
-    }else if(type == "link") {
-        $(this.data_id).html(this.linkhtml(d, edit));
-        if(edit) {
-            this.activate_tool(".cancel", "Cancel", function(){self.show(d,"link");});
-            this.activate_tool(".submit", "Save",   function(){self.link_update(d);});
-        }else{
-            this.activate_tool(".add",  "Add Link",	function(){self.link_new();});
-            this.activate_tool(".edit", "Edit Link",	function(){self.link_edit(d);});
-            this.activate_tool(".delete", "Delete Link",function(){self.link_delete(d);});
-        }
-    }else{
+    if(typeof d === 'undefined' || typeof type === 'undefined' || (!edit && $.isEmptyObject(d))) {
         $(this.data_id).html("");
         this.activate_tool(".add",  "Add Node",  function(){self.node_new();});
+    }else{ 
+        if(type == "node") {
+            $(this.data_id).html(this.nodehtml(d, edit));
+            if(edit) {
+                this.activate_tool(".cancel", "Cancel", function(){self.show(d,"node");});
+                this.activate_tool(".submit", "Save",   function(){self.node_update(d);});
+            }else{
+                this.activate_tool(".add",  "Add Node",	function(){self.node_new();});
+                this.activate_tool(".edit", "Edit Node",	function(){self.node_edit(d);});
+                this.activate_tool(".delete", "Delete Node",function(){self.node_delete(d);});
+                this.activate_tool(".link", "Link Node", 	function(){self.link_new(d);});
+            }
+        }else if(type == "link") {
+            $(this.data_id).html(this.linkhtml(d, edit));
+            if(edit) {
+                this.activate_tool(".cancel", "Cancel", function(){self.show(d,"link");});
+                this.activate_tool(".submit", "Save",   function(){self.link_update(d);});
+            }else{
+                this.activate_tool(".add",  "Add Link",	function(){self.link_new();});
+                this.activate_tool(".edit", "Edit Link",	function(){self.link_edit(d);});
+                this.activate_tool(".delete", "Delete Link",function(){self.link_delete(d);});
+            }
+        }else{
+            errorHandle("Sorry, cannot show entity of type <"+type+">.");            
+        }
     }
     // Adjust box height
     $(this.data_id).height( "auto" );
@@ -1177,8 +1181,11 @@ GraphLayout.prototype.init = function() {
             
             var link = self.svg.selectAll('.link');
             link.attr("d", function(d) {
+                // get corrected link info
                 var clink = self.correctLink(d, self.link_spread);
-                if(d.weight == 1 || d.flow == FLOW_CONNECT) 
+                // use line if single link or flow link
+                // otherwise, use arc.
+                if(d.weight == 1 || d.flow == FLOW_CONNECT)
                     return self.pathline(clink);
                 else
                     return self.patharc(clink);
@@ -1251,9 +1258,10 @@ GraphLayout.prototype.update = function() {
                     return "url(#larrow"+d.type+")";
             }});
 
-    /* Ideally this is done with positional markers;
+    /* Ideally this is done with "positional markers";
      * tick() updates their position given the direction.
-     * See https://www.w3.org/TR/svg-markers/.
+     * See https://www.w3.org/TR/svg-markers/, and stay
+     * tuned for when they work.
      * 
      *linkEnter.append('marker')
      *        .attr({
