@@ -1,0 +1,43 @@
+	<div id="data">
+	  <div id="graph">
+	    <div id="filter" class="floatbox">
+	      <h3>Filter links</h3>
+	      <div id="filters">
+	      </div>
+	    </div>
+
+	    <div id="graph_info" class="floatbox">
+              <div id="metadata">
+	      </div>
+              <div id="toolbox" class="editing_GUI">
+		<span class="item add" title="Add Node"><a><i class="fa fa-plus fa-2x"></i></a></span>
+		<span class="item edit" title="Edit"><a><i class="fa fa-pencil fa-2x"></i></a></span>
+		<span class="item delete" title="Delete"><a><i class="fa fa-times fa-2x"></i></a></span>
+		<span class="item link" title="Add link"><a><i class="fa fa-link fa-2x"></i></a></span>
+		<span class="item cancel" title="Cancel"><a><i class="fa fa-arrow-circle-o-left fa-2x"></i></a></span>
+		<span class="item submit" title="Save"><a><i class="fa fa-floppy-o fa-2x"></i></a></span>
+              </div>
+	    </div>
+	    
+	    <div id="help" class="floatbox">
+	    </div>
+	    
+	    <script type="text/javascript">
+              var g = new GraphLayout("#graph", "mugdata.json");
+              var vg = new VGraph(g.graph, "#graph_info");
+              vg.register_callback(function(){g.update();});
+              g.on("node_click", function(node){vg.show(node, "node");});
+              g.on("link_click", function(link){vg.show(link, "link");});
+              make_filters("#filters", g);
+              g.register_tool(function(){$("#filter").toggle();}, "images/funnel.svg",
+                              "Filter links (click to see options)");
+
+              $(document).ready( function() { $("#help").load("help.html"); });
+              function htoggle() {$("#help").toggle();}
+              function hhide() {$("#help").hide();}
+              g.register_tool(htoggle, "images/help.svg", "Show help", 0);
+              $("#help").click(hhide);
+            </script>
+	  </div>
+	  <div id="debug"></div>
+	</div>	
