@@ -1,3 +1,13 @@
+/* Configuration */
+/* Editing GUI:
+ *  settings of ".editing_GUI" affect all content related to
+ *  the editing GUI; for example, setting "display" to "none"
+ *  allows to effectively hide all traces of editability.
+ */
+
+.editing_GUI {display: none}
+
+/* General */
 img {margin: 10px}
 p {margin: 10px}
 .small {font-size: 80%}
