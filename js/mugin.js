@@ -749,6 +749,8 @@ VGraph.prototype.show = function(d, type, edit=false) {
     var Hdata    = $(this.data_id).outerHeight(),
         Htoolbox = $(this.tbox_id).outerHeight(),
         Hbox     = Hdata + Htoolbox;
+    if($(this.tbox_id).css("display") == "none")
+        Hbox     = Hdata;
     if(Hbox > height) { // cap to svg height
         Hbox = height;
         $(this.data_id).height( Hbox - Htoolbox );
@@ -1652,7 +1654,7 @@ function pentagon(layout) {
 function hexagon(layout) {
     var a=0.5,
         b=1.0,
-        c=1.0,
+        c=1.15,
         d=1.4*c,
         scale=220;
     var locations = {
@@ -1718,8 +1720,8 @@ function upload_json(callback, extension="json") {
     /*
      * Calling this function triggers a file-selection mask to
      * upload a file with the specified extension using
-     * FileReader, and running the specified with the uploaded
-     * object as argument.
+     * FileReader, and running the specified callback with the
+     * uploaded object as argument.
      *
      */
     d3.select('body')
