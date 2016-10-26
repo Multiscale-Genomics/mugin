@@ -1,0 +1,113 @@
+	      <h3>Documentation</h3>
+	      <p>
+		Welcome to the MuG Information Network (MIN), a tool
+		to visualise the flow of information within the
+		Multiscale Complex Genomics project. 
+		This is a short help about how to use the MIN (please
+		scroll down); <b>click on this box to close it</b>.
+		<!-- You can find more information about the MIN
+		<a target="blank" href="min.html">here</a>. -->
+	      </p>
+	      <img src="images/screenshot.svg" />
+	      <h4>The Network: Nodes and links</h4>
+	      <p>
+		The MIN shows nodes (grey ellipses) and links (colored arrows
+		connecting nodes).  By clicking on nodes and links, further information will
+		appear in the <b>Information box</b> on the right hand side of the page.
+		Drag a node to move it around in the page: other nodes will react to keep
+		the network compact; shift-click nodes to fix/unfix their position in the page.
+	      </p>
+	      <h5>Nodes</h5>
+	      <p> Each <b>node</b> in the MIN is a type of data that is
+		relevant for research in Multiscale Complex Genomics. 
+		Nodes are characterised by two fields:
+		<dl>
+		  <dt>Name</dt><dd>A very concise name used to represent the node in the network</dd>
+		  <dt>Description</dt><dd>A comprehensive description of the data type</dd>
+		  <dt>Weight</dt><dd>The number of links involving the node</dd>
+		</dl>
+	      </p>
+	      <h5>Links</h5>
+	      <p>
+		Each <b>link</b> in the MIN is a scientific connection
+		between nodes, which is a fairly loose concept that
+		can represent a
+		variety of things.
+		<!-- <a target="blank" href="min.html">variety of things</a>. -->
+		Links are primarily characterised by their source and target nodes, as well as
+		other properties:
+		<dl>
+		  <dt>Description</dt><dd>A comprehensive description of the connection</dd>
+		  <dt>Pilot</dt><dd>The pilot project (or projects) within which the connection is relevant</dd>
+		  <dt>Tools</dt><dd>A list of available tools that implement the connection</dd>
+		  <dt>References</dt><dd>A list of literature references that describe or employ the connection</dd>
+		  <dt>Links</dt><dd>A list of URLs pointing to web pages which describe the connection</dd>
+		  <dt>Flow</dt><dd><i>inform</i> or <i>connect</i> (see below)</dd>
+		  <dt>Type</dt><dd><i>tools available</i>, <i>relevant</i> or <i>potential</i> (see below)</dd>
+		  <dt>Notes</dt><dd>Any additional information or comments not contained in the previous fields</dd>
+		</dl>
+	      </p>
+	      <p>
+		Links are categorised according to the
+		information <b>flow</b> they convey. Links have one arrow
+		(<i>inform</i>) when there is a clear direction of information flow,
+		for example for conversion tools, or when one data
+		type informs another. Links have two arrows (<i>connect</i>) when the two
+		data types have equivalent roles, and are integrated for
+		example in a combined view or to answer a specific
+		question.
+	      </p>
+	      <p>
+		Links are also categorised according
+		to how established the connection they describe is:
+		<span class="done">blue when there are <b>tools available</b> in
+		  the MuG VRE</span>, <span class="todo">green when
+		the connection has been shown to be <b>relevant</b> in the
+		  literature</span> and finally <span class="maybe">red
+		when the connection is of <b>potential</b> interest
+		for Multiscale Complex Genomics
+		research</span>. 
+	      </p>
+	      <h4>The MIN toolbox</h4>
+	      <p>
+		At the centre of the page there is a
+		a collection of tools available to perform various actions:
+		  <dl>
+		    <dd><img src="images/help.svg" /> Show/hide this help</dd>
+		    <dd><img src="images/clouddown.svg" /> Download the network in JSON format</dd>
+		    <dd><img src="images/circle.svg" /> Arrange nodes in a circle</dd>
+		    <dd><img src="images/hexagon.svg" /> Activate the hexagonal view</dd>
+		    <dd><img src="images/spring.svg" /> Unfix all nodes</dd>
+		    <dd><img src="images/laydown.svg" /> Download layout in JSON format</dd>
+		    <dd><img src="images/layup.svg" /> Set layout using a JSON file</dd>
+		    <dd><img src="images/funnel.svg" /> Filter nodes (press to show filtering options)</dd>
+		  </dl>
+	      </p>
+	      <div id="#edit" class="editing_GUI">
+		<h4>Editing the network</h4>
+		<p>
+		  In the lower part of the <b>Information box</b>, a
+		  toolbox is available to modify the information
+		  in the network. The following actions are available
+		  (the final two are only available while editing):
+		  <dl>
+		    <dd><i class="fa fa-plus fa-2x"></i> New node / link</dd>
+		    <dd><i class="fa fa-pencil fa-2x"></i> Edit selected node / link</dd>
+		    <dd><i class="fa fa-times fa-2x"></i> Delete selected node / link</dd>
+		    <dd><i class="fa fa-link fa-2x"></i> Create new link from selected node</dd>
+		    <dd><i class="fa fa-arrow-circle-o-left fa-2x"></i> Cancel editing</dd>
+		    <dd><i class="fa fa-floppy-o fa-2x"></i> Save edited information</dd>
+		  </dl>
+		</p>
+		<p>
+		  When editing a Link, the properties <b>Tools</b>, <b>References</b> and <b>Links</b> are lists of entries,
+		  each composed of two fields:
+		  <dl>
+		    <dt>Text</dt><dd>A short description</dd>
+		    <dt>Link</dt><dd>A URL pointing to a relevant web page.</dd>
+		  </dl>
+		</p>
+		<p>
+		  <b>Please note that any changes you make will be lost if you refresh the page.</b>
+		</p>
+	      </div>
