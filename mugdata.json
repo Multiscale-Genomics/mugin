@@ -7,8 +7,8 @@
   {"name":"Chromatin structure","description":"Three-dimensional structures of chromatin, generally predicted on the basis of contact matrices."},
   {"name":"ChIP-seq","description":"Information on the genome sequences to which a DNA-binding protein is bound in the cell."},
   {"name":"Physical models (kbp)","description":"Physical models of chromatin at the kilo-base-pair resolution, used to describe the epigenetic-dependent mechanics and interactions of chromatin segments of several million bps."},
-  {"name":"Atomistic MD","description":"Time-dependent behaviour of DNA and protein-DNA complexes at the atomic scale, obtained using Molecular Dynamics with an underlying physical model, giving access to space- and time-resolved information on the complex."},
-  {"name":"FISH","description":"Microscopy imaging data obtained by marking with fluorescent probes specific regions of the genome, used to identify the (relative) location of genome segments in the cell."}
+  {"name":"FISH","description":"Microscopy imaging data obtained by marking with fluorescent probes specific regions of the genome, used to identify the (relative) location of genome segments in the cell."},
+  {"name":"Atomistic MD","description":"Time-dependent behaviour of DNA and protein-DNA complexes at the atomic scale, obtained using Molecular Dynamics with an underlying physical model, giving access to space- and time-resolved information on the complex."}
  ],
  "links":
  [{"source":"MNase-seq","target":"RNA-seq","flow":0,"description":"Relate nucleosome dynamics with gene expression","reference":[{"link":"www.ncbi.nlm.nih.gov/pubmed/26818620","text":"Deniz et al., 2016"}],"notes":"Through sequence","tools":[],"type":"1","links":[],"pilot":2},
