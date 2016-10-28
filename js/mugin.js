@@ -1386,8 +1386,8 @@ GraphLayout.prototype.correctLink = function(link, dth) {
         sst = Math.sin(sth),
         tct = Math.cos(tth),
         tst = Math.sin(tth),
-        sr = s_rx*s_ry/Math.sqrt((s_ry*sct)**2 + (s_rx*sst)**2),
-        tr = t_rx*t_ry/Math.sqrt((t_ry*tct)**2 + (t_rx*tst)**2),
+        sr = s_rx*s_ry/Math.sqrt(Math.pow(s_ry*sct,2) + Math.pow(s_rx*sst,2)),
+        tr = t_rx*t_ry/Math.sqrt(Math.pow(t_ry*tct,2) + Math.pow(t_rx*tst,2)),
         dsx = sr * sct,
         dsy = sr * sst,
         dtx = tr * tct,
@@ -1672,7 +1672,7 @@ function hexagon(layout) {
 }
 
 function circle(layout, random = false) {
-    var scale=200,
+    var scale=185,
         locations = {},
         th;
     layout.graph.nodes.forEach(function(d,i,A) {
