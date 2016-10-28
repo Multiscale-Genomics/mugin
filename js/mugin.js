@@ -1373,7 +1373,7 @@ GraphLayout.prototype.correctLink = function(link, dth) {
     var rdx = link.target.x - link.source.x,
         rdy = link.target.y - link.source.y,
         th  = Math.atan2(rdy, rdx),
-        dth = (link.flow == FLOW_CONNECT ? 0:dth),
+        dth = (link.flow == FLOW_CONNECT ? 0 : link.weight > 1 ? dth:0),
         sdr = this.correctRadius(link.source, link.flow == FLOW_CONNECT),
         tdr = this.correctRadius(link.target, true),
         s_rx = link.source.rx + sdr,
