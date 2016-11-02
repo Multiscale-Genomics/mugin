@@ -716,7 +716,7 @@ VGraph.prototype.show = function(d, type, edit=false) {
     var self = this;
     $(this.tbox_id+" .item").hide(); // hide all
     if(typeof d === 'undefined' || typeof type === 'undefined' || (!edit && $.isEmptyObject(d))) {
-        $(this.data_id).html("");
+        $(this.data_id).html("Click a node or link...");
         this.activate_tool(".add",  "Add Node",  function(){self.node_new();});
     }else{ 
         if(type == "node") {
@@ -1217,6 +1217,10 @@ GraphLayout.prototype.update = function() {
      * Call this whenever the data changes (including at init time)
      */
     var self = this;
+
+    // Resize Legend
+    this.resize_legend();
+
     // Add/update links
     var link = this.svg.select("#link-container").selectAll('.linkg')
         .data(this.graph.links);
@@ -1576,8 +1580,6 @@ GraphLayout.prototype.make_legend = function() {
         .attr({
             x: LEGEND_WID+LEGEND_MRG
         });
-    var widths = [];
-    Eenter.selectAll("text").each(function(){widths.push(this.getComputedTextLength());});
     legend.append("rect")
         .attr({
             class: "legendbox",
@@ -1585,8 +1587,22 @@ GraphLayout.prototype.make_legend = function() {
             y: LEGEND_POSy,
             rx: 10,
             ry: 10,
-            width: Math.max.apply(null, widths)+LEGEND_WID+LEGEND_MRG+10,
+            width: LEGEND_WID+LEGEND_MRG+10,
             height: LEGEND_HIG*NTYPES+10
+        });
+    this.resize_legend();
+}
+
+GraphLayout.prototype.resize_legend = function() {
+    /*
+     * Resize the legend to match contained text.
+     */
+    var legend = d3.select(".legend");
+    var widths = [];
+    legend.selectAll("text").each(function(){widths.push(this.getComputedTextLength());});
+    d3.select(".legendbox")
+        .attr({
+            width: Math.max.apply(null, widths)+LEGEND_WID+LEGEND_MRG+10,
         });
 }
 

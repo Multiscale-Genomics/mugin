@@ -1,4 +1,4 @@
-	<div id="data">
+	<div id="data" style="height:500px">
 	  <div id="graph">
 	    <div id="filter" class="floatbox">
 	      <h3>Filter links</h3>
@@ -32,11 +32,16 @@
               g.register_tool(function(){$("#filter").toggle();}, "images/funnel.svg",
                               "Filter links (click to see options)");
 
-              $(document).ready( function() { $("#help").load("help.html"); });
+              $(document).ready( function() {
+                  $("#help").load("help.html");
+                  $("#help").click(hhide);
+              });
+              $(window).on("load", function() {
+                  vg.update();
+              });
               function htoggle() {$("#help").toggle();}
               function hhide() {$("#help").hide();}
               g.register_tool(htoggle, "images/help.svg", "Show help", 0);
-              $("#help").click(hhide);
             </script>
 	  </div>
 	  <div id="debug"></div>
