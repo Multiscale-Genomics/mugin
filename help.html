@@ -1,65 +1,4 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <meta name="description" content="" />
-    <meta name="author" content="The MuG project" />
-    <link rel="icon" href="favicon.ico" />
-
-    <title>The MuG Information Network</title>
-
-    <script type="text/javascript" src="SpryAssets/SpryMenuBar.js"></script>
-    <script src="js/vendor/d3.v3.js"></script>
-    <script src="js/vendor/jquery.min.js"></script>
-    <script src="js/mugin.js"></script>
-    <link href="css/MuG.css" rel="stylesheet" type="text/css" media="all" />
-    <link href="SpryAssets/SpryMenuBarHorizontal.css" rel="stylesheet" type="text/css" media="all" />
-    <link href="css/mugin.css" rel="stylesheet" />
-    <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
-  </head>
-
-  <body>
-    <div id="container">
-
-      <!-- HEADER: MuG logo -->
-      <div id="header">
-	<p align="left"><img src="images/topWeb.png" alt="MuG" width="900" height="124" /></p>
-	<p align="center"><strong>The MuG Information Network</strong> </p>
-      </div>
-      <div id="menu">
-	<ul id="MenuBar1" class="MenuBarHorizontal">
-	</ul>
-      </div>
-      <div style='clear:both'></div>
-
-      <!-- Main content -->
-      <div id="content">
-
-	<div id="intro">
-	</div>
-
-	<div id="data">
-	  <!-- <h3></h3> -->
-	  <div id="graph">
-	    <div id="filter" class="floatbox">
-	      <h3>Filter links</h3>
-	      <div id="filters">
-	      </div>
-	    </div>
-	    <div id="graph_info" class="floatbox">
-              <div id="metadata">
-	      </div>
-              <div id="toolbox">
-		<span class="item add" title="Add Node"><a><i class="fa fa-plus fa-2x"></i></a></span>
-		<span class="item edit" title="Edit"><a><i class="fa fa-pencil fa-2x"></i></a></span>
-		<span class="item delete" title="Delete"><a><i class="fa fa-times fa-2x"></i></a></span>
-		<span class="item link" title="Add link"><a><i class="fa fa-link fa-2x"></i></a></span>
-		<span class="item cancel" title="Cancel"><a><i class="fa fa-arrow-circle-o-left fa-2x"></i></a></span>
-		<span class="item submit" title="Save"><a><i class="fa fa-floppy-o fa-2x"></i></a></span>
-              </div>
-	    </div>
-	    <div id="help" class="floatbox">
-	      <h3>The MuG Information Network</h3>
+	      <h3>Documentation</h3>
 	      <p>
 		Welcome to the MuG Information Network (MIN), a tool
 		to visualise the flow of information within the
@@ -138,11 +77,13 @@
 		    <dd><img src="images/clouddown.svg" /> Download the network in JSON format</dd>
 		    <dd><img src="images/circle.svg" /> Arrange nodes in a circle</dd>
 		    <dd><img src="images/hexagon.svg" /> Activate the hexagonal view</dd>
-		    <dd><img src="images/release.svg" /> Unfix all nodes</dd>
+		    <dd><img src="images/spring.svg" /> Unfix all nodes</dd>
+		    <dd><img src="images/laydown.svg" /> Download layout in JSON format</dd>
+		    <dd><img src="images/layup.svg" /> Set layout using a JSON file</dd>
 		    <dd><img src="images/funnel.svg" /> Filter nodes (press to show filtering options)</dd>
 		  </dl>
 	      </p>
-	      <div id="#edit">
+	      <div id="#edit" class="editing_GUI">
 		<h4>Editing the network</h4>
 		<p>
 		  In the lower part of the <b>Information box</b>, a
@@ -170,40 +111,3 @@
 		  <b>Please note that any changes you make will be lost if you refresh the page.</b>
 		</p>
 	      </div>
-	    </div>
-	    <script type="text/javascript">
-              var g = new GraphLayout("#graph", "mugdata.json");
-              var vg = new VGraph(g.graph, "#graph_info");
-              vg.register_callback(function(){g.update();});
-              g.on("node_click", function(node){vg.show(node, "node");});
-              g.on("link_click", function(link){vg.show(link, "link");});
-              make_filters("#filters", g);
-              g.register_tool(function(){$("#filter").toggle();}, "images/funnel.svg",
-                             "Filter links (click to see options)");
-              function htoggle() {$("#help").toggle();}
-              function hhide() {$("#help").hide();}
-              g.register_tool(htoggle, "images/help.svg", "Show help", 0);
-              $("#help").click(hhide);
-            </script>
-	  </div>
-	  <div id="debug"></div>
-	</div>	
-      </div>
-
-      <div id="footnotes">
-      </div>
-
-      <!-- FOOTER: MuG info -->
-      <div id="footer">
-	<table width="100%" cellpadding="4">
-	  <tr>
-            <td><img src="images/flag_yellow_high.jpg" alt="EU Logo" width="78" height="51" /></td>
-            <td>This project has  received funding from the European Union's Horizon 2020 research and innovation  programme under grant agreement No 676556.</td>
-	  </tr>
-	</table>
-      </div>
-
-    </div>
-  </body>
-</html>
-

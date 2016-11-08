@@ -15,6 +15,7 @@
  * v0.5 160601
  * v0.5.1 160613
  * v0.5.2 160613
+ * v0.5.3 160930
  * TODO: 
  *  1. directional links DONE v0.2
  *  2. double links      DONE v0.2
@@ -26,7 +27,7 @@
  *  6. graph bidimensional sorting
  *  6a. add sortable info to nodes
  *  7. multiple entries per link
- *  8. save layouts
+ *  8. save/load layouts DONE v0.5.3
  */
 
 /* Constants */
@@ -582,8 +583,9 @@ VGraph.prototype.nodehtml = function(node, edit=false) {
     }else{
         nodestr += "<tr><th>Node:</th><th>"+node.name+"</th></tr>";
     }
+    if(edit)
+        nodestr += this.field("name", node.name, "text", edit);
     nodestr +=
-        this.field("name", node.name, "text", edit) +
         this.field("description", node.description, "textarea", edit) +
         this.field("weight", node.weight, "text", edit, true) +
         "</table>";
@@ -713,36 +715,42 @@ VGraph.prototype.show = function(d, type, edit=false) {
      */
     var self = this;
     $(this.tbox_id+" .item").hide(); // hide all
-    if(type == "node") {
-        $(this.data_id).html(this.nodehtml(d, edit));
-        if(edit) {
-            this.activate_tool(".cancel", "Cancel", function(){self.show(d,"node");});
-            this.activate_tool(".submit", "Save",   function(){self.node_update(d);});
-        }else{
-            this.activate_tool(".add",  "Add Node",	function(){self.node_new();});
-            this.activate_tool(".edit", "Edit Node",	function(){self.node_edit(d);});
-            this.activate_tool(".delete", "Delete Node",function(){self.node_delete(d);});
-            this.activate_tool(".link", "Link Node", 	function(){self.link_new(d);});
-        }
-    }else if(type == "link") {
-        $(this.data_id).html(this.linkhtml(d, edit));
-        if(edit) {
-            this.activate_tool(".cancel", "Cancel", function(){self.show(d,"link");});
-            this.activate_tool(".submit", "Save",   function(){self.link_update(d);});
-        }else{
-            this.activate_tool(".add",  "Add Link",	function(){self.link_new();});
-            this.activate_tool(".edit", "Edit Link",	function(){self.link_edit(d);});
-            this.activate_tool(".delete", "Delete Link",function(){self.link_delete(d);});
-        }
-    }else{
-        $(this.data_id).html("");
+    if(typeof d === 'undefined' || typeof type === 'undefined' || (!edit && $.isEmptyObject(d))) {
+        $(this.data_id).html("Click a node or link...");
         this.activate_tool(".add",  "Add Node",  function(){self.node_new();});
+    }else{ 
+        if(type == "node") {
+            $(this.data_id).html(this.nodehtml(d, edit));
+            if(edit) {
+                this.activate_tool(".cancel", "Cancel", function(){self.show(d,"node");});
+                this.activate_tool(".submit", "Save",   function(){self.node_update(d);});
+            }else{
+                this.activate_tool(".add",  "Add Node",	function(){self.node_new();});
+                this.activate_tool(".edit", "Edit Node",	function(){self.node_edit(d);});
+                this.activate_tool(".delete", "Delete Node",function(){self.node_delete(d);});
+                this.activate_tool(".link", "Link Node", 	function(){self.link_new(d);});
+            }
+        }else if(type == "link") {
+            $(this.data_id).html(this.linkhtml(d, edit));
+            if(edit) {
+                this.activate_tool(".cancel", "Cancel", function(){self.show(d,"link");});
+                this.activate_tool(".submit", "Save",   function(){self.link_update(d);});
+            }else{
+                this.activate_tool(".add",  "Add Link",	function(){self.link_new();});
+                this.activate_tool(".edit", "Edit Link",	function(){self.link_edit(d);});
+                this.activate_tool(".delete", "Delete Link",function(){self.link_delete(d);});
+            }
+        }else{
+            errorHandle("Sorry, cannot show entity of type <"+type+">.");            
+        }
     }
     // Adjust box height
     $(this.data_id).height( "auto" );
     var Hdata    = $(this.data_id).outerHeight(),
         Htoolbox = $(this.tbox_id).outerHeight(),
         Hbox     = Hdata + Htoolbox;
+    if($(this.tbox_id).css("display") == "none")
+        Hbox     = Hdata;
     if(Hbox > height) { // cap to svg height
         Hbox = height;
         $(this.data_id).height( Hbox - Htoolbox );
@@ -1045,7 +1053,8 @@ function make_filters(id, layout) {
  *  - refresh():  re-optimise node locations
  *  - release():  release all nodes that are fixed
  *  - on(event, callback):  register a callback for an event.
- *  - locations(locations, scale): set the positions of nodes.
+ *  - set_locations(locations, scale): set the positions of nodes.
+ *  - get_locations(): get the positions of nodes.
  */
 var GraphLayout = function(id, filein, type="json") {
     /*
@@ -1109,10 +1118,12 @@ var GraphLayout = function(id, filein, type="json") {
     this.tools = [];
     this.modified = false;
     //this.register_tool(function() {submit_json(self.graph.to_json());}, "images/cloudup.svg", "Save changes to server");
-    this.register_tool(function() {download_json(self.graph.to_json());}, "images/clouddown.svg", "Download changes as JSON");
+    this.register_tool(function() {download_json(self.graph.to_json());}, "images/clouddown.svg", "Download network as JSON");
     this.register_tool(function() {circle(self);}, "images/circle.svg", "Arrange nodes in a circle");
     this.register_tool(function() {hexagon(self);}, "images/hexagon.svg", "Arrange nodes in a hexagon");
-    this.register_tool(function() {self.release();}, "images/release.svg", "Release all fixed nodes");
+    this.register_tool(function() {self.release();}, "images/spring.svg", "Release all fixed nodes");
+    this.register_tool(function() {download_json(JSON.stringify(self.get_locations()), "layout.json");}, "images/laydown.svg", "Download node layout");
+    this.register_tool(function() {upload_json(function(layout){self.set_locations(layout, 1, false);});}, "images/layup.svg", "Upload node layout");
     
     this.node_callback = null;
     this.link_callback = null;
@@ -1172,8 +1183,11 @@ GraphLayout.prototype.init = function() {
             
             var link = self.svg.selectAll('.link');
             link.attr("d", function(d) {
+                // get corrected link info
                 var clink = self.correctLink(d, self.link_spread);
-                if(d.weight == 1 || d.flow == FLOW_CONNECT) 
+                // use line if single link or flow link
+                // otherwise, use arc.
+                if(d.weight == 1 || d.flow == FLOW_CONNECT)
                     return self.pathline(clink);
                 else
                     return self.patharc(clink);
@@ -1203,6 +1217,10 @@ GraphLayout.prototype.update = function() {
      * Call this whenever the data changes (including at init time)
      */
     var self = this;
+
+    // Resize Legend
+    this.resize_legend();
+
     // Add/update links
     var link = this.svg.select("#link-container").selectAll('.linkg')
         .data(this.graph.links);
@@ -1246,9 +1264,10 @@ GraphLayout.prototype.update = function() {
                     return "url(#larrow"+d.type+")";
             }});
 
-    /* Ideally this is done with positional markers;
+    /* Ideally this is done with "positional markers";
      * tick() updates their position given the direction.
-     * See https://www.w3.org/TR/svg-markers/.
+     * See https://www.w3.org/TR/svg-markers/, and stay
+     * tuned for when they work.
      * 
      *linkEnter.append('marker')
      *        .attr({
@@ -1283,28 +1302,29 @@ GraphLayout.prototype.update = function() {
 
     nodeEnter.append("ellipse") // Add ellipse
         .attr('class', 'nodecirc');
-    // Use selection.select to propagate data to children
-    node.select('.nodecirc')
-        .attr({
-            rx: function(d) {
-                d.rx = Math.max(30, d.name.length*4);
-                return d.rx;
-            },
-            ry: function(d) {
-                d.ry = 30;
-                return d.ry;
-            }});
-
     nodeEnter.append("text")    // Add text
         .attr({
             class: 'nodetxt',
             dy: 5,
             'text-anchor': "middle",
         });
+    
     // Use selection.select to propagate data to children
     node.select('.nodetxt')
         .text(function(d) { return d.name; });
-
+    
+    // Use selection.select to propagate data to children
+    node.select('.nodecirc')
+        .attr({
+            rx: function(d) {
+                d.rx = Math.max(30, d3.select(this.parentNode).select('.nodetxt').node().getBBox().width/1.8);
+                return d.rx;
+            },
+            ry: function(d) {
+                d.ry = 30;
+                return d.ry;
+            }});
+    
     this.force.start();
 }
 
@@ -1357,17 +1377,25 @@ GraphLayout.prototype.correctLink = function(link, dth) {
     var rdx = link.target.x - link.source.x,
         rdy = link.target.y - link.source.y,
         th  = Math.atan2(rdy, rdx),
-        dth = (link.flow == FLOW_CONNECT ? 0:dth),
+        dth = (link.flow == FLOW_CONNECT ? 0 : link.weight > 1 ? dth:0),
         sdr = this.correctRadius(link.source, link.flow == FLOW_CONNECT),
         tdr = this.correctRadius(link.target, true),
         s_rx = link.source.rx + sdr,
         s_ry = link.source.ry + sdr,
         t_rx = link.target.rx + tdr,
         t_ry = link.target.ry + tdr,
-        dsx = s_rx * Math.cos(th-dth/2),
-        dsy = s_ry * Math.sin(th-dth/2),
-        dtx = t_rx * Math.cos(th+dth/2),
-        dty = t_ry * Math.sin(th+dth/2),
+        sth = th-dth/2,
+        tth = th+dth/2,
+        sct = Math.cos(sth),
+        sst = Math.sin(sth),
+        tct = Math.cos(tth),
+        tst = Math.sin(tth),
+        sr = s_rx*s_ry/Math.sqrt(Math.pow(s_ry*sct,2) + Math.pow(s_rx*sst,2)),
+        tr = t_rx*t_ry/Math.sqrt(Math.pow(t_ry*tct,2) + Math.pow(t_rx*tst,2)),
+        dsx = sr * sct,
+        dsy = sr * sst,
+        dtx = tr * tct,
+        dty = tr * tst,
         dx  = rdx - dsx - dtx,
         dy  = rdy - dsy - dty;
 
@@ -1400,7 +1428,7 @@ GraphLayout.prototype.patharc = function(link) {
 }
 
 /* Location functions */
-GraphLayout.prototype.locations = function(locations, scale) {
+GraphLayout.prototype.set_locations = function(locations, scale, centered=true) {
     /*
      * Set the location of nodes in the layout by using
      * the information specified in =locations=, scaled
@@ -1408,23 +1436,36 @@ GraphLayout.prototype.locations = function(locations, scale) {
      *
      * Arguments:
      *    - locations: a structure relating node names,
-     *      as strings, to [x, y] pairs, where [0, 0] is
-     *      the center of the svg.
+     *      as strings, to [x, y] pairs.
      *    - scale: a scalar used to multiply coordinates.
+     *    - centered: boolean defining the coordinate system
+     *      for locations:
+     *      true (default): [0,0] is the bottom center of the
+     *      SVG, with y increasing upwards;
+     *      false: [0,0] is the top-left corner of the SVG,
+     *      with y increasing downwards.
      */
     var node = this.svg.selectAll('.node');
     node.attr({
         cx: function(d){d.fixed=true; d.conf=true; return d.x;},
         cy: function(d){return d.y;}
     });
+    var x0 = width/2,
+        y0 = 0.9*height,
+        yd = -1;
+    if(!centered) {
+        x0 = 0,
+        y0 = 0,
+        yd = +1;
+    }
     node.transition().duration(transitionDuration).attr({
         cx: function(d) {
             var loc = locations[d.name];
             if(!loc) {
                 message(LOG_WARN, d.name+" not found in locations!");
-                return width/2;
+                return x0;
             }
-            return scale*loc[0]+width/2;
+            return x0 + scale*loc[0];
         },
         cy: function(d) {
             var loc = locations[d.name];
@@ -1432,10 +1473,32 @@ GraphLayout.prototype.locations = function(locations, scale) {
                 message(LOG_WARN, d.name+" not found in locations!");
                 return height/2;
             }
-            return 0.9*height-scale*loc[1];
+            return y0 + yd * scale*loc[1];
         }})
         .each("end", function(d) {d.px=d.x; d.py=d.y; d.conf=false;});
     this.refresh();
+}
+
+GraphLayout.prototype.get_locations = function() {
+    /*
+     * Get the location of nodes in the layout.
+     *
+     * Returns a structure relating node names,
+     * as strings, to [x, y] pairs, where [0, 0] is
+     * the top-left corner of the SVG.
+     *
+     * Usage:
+     *  g = GraphLayout(...);
+     *  loc = g.get_locations();
+     *  g.set_locations(loc, 1, false);
+     *
+     */
+    var locations = {};
+    var node = this.svg.selectAll('.node');
+    node.each(function(d,i) {
+        locations[d.name] = [d.x, d.y];
+    });
+    return locations;
 }
 
 /* Other UI functions */
@@ -1517,8 +1580,6 @@ GraphLayout.prototype.make_legend = function() {
         .attr({
             x: LEGEND_WID+LEGEND_MRG
         });
-    var widths = [];
-    Eenter.selectAll("text").each(function(){widths.push(this.getComputedTextLength());});
     legend.append("rect")
         .attr({
             class: "legendbox",
@@ -1526,8 +1587,22 @@ GraphLayout.prototype.make_legend = function() {
             y: LEGEND_POSy,
             rx: 10,
             ry: 10,
-            width: Math.max.apply(null, widths)+LEGEND_WID+LEGEND_MRG+10,
+            width: LEGEND_WID+LEGEND_MRG+10,
             height: LEGEND_HIG*NTYPES+10
+        });
+    this.resize_legend();
+}
+
+GraphLayout.prototype.resize_legend = function() {
+    /*
+     * Resize the legend to match contained text.
+     */
+    var legend = d3.select(".legend");
+    var widths = [];
+    legend.selectAll("text").each(function(){widths.push(this.getComputedTextLength());});
+    d3.select(".legendbox")
+        .attr({
+            width: Math.max.apply(null, widths)+LEGEND_WID+LEGEND_MRG+10,
         });
 }
 
@@ -1579,41 +1654,41 @@ function pentagon(layout) {
         d=0.9,
         scale=400;
     var locations = {
-        "MNase": 	 [0,  d],
+        "MNase-seq": 	 [0,  d],
         "RNA-seq": 	 [-a, c*0.7],
         "Histone marks": [0,  c*0.75],
         "ChIP-seq":	 [b,  c],
         "Hi-C":		 [a,  a], 
-        "Models (bp)": 	 [-b, c],
-        "3D chromatin":	 [a,  0],
-        "Models (kbp)":	 [-a, 0],
-        "DNA MD":	 [-a, d],
+        "Physical models (bp)": 	[-b, c],
+        "Chromatin structure":	 	[a,  0],
+        "Physical models (kbp)":	[-a, 0],
+        "Atomistic MD":	 		[-a, d],
         "FISH":		 [-a*0.6, c*0.4]};
-    layout.locations(locations, scale);
+    layout.set_locations(locations, scale);
 }
 
 function hexagon(layout) {
     var a=0.5,
         b=1.0,
-        c=1.0,
+        c=1.15,
         d=1.4*c,
-        scale=250;
+        scale=220;
     var locations = {
-	"MNase":	 [a,  d],
-	"RNA-seq":	 [-a*1.15, c*0.7],
+	"MNase-seq":	 [a,  d],
+	"RNA-seq":	 [-a*1.2, c*0.75],
 	"Histone marks": [0,  c*0.75],
 	"ChIP-seq":	 [b,  c],
 	"Hi-C":		 [a,  a*1.1], 
-	"Models (bp)": 	 [-b, c],
-	"3D chromatin":	 [a,  0],
-	"Models (kbp)":	 [-a, 0],
-	"DNA MD":	 [-a, d],
+	"Physical models (bp)": [-b, c],
+	"Chromatin structure":  [a,  0],
+	"Physical models (kbp)":[-a, 0],
+	"Atomistic MD":         [-a, d],
 	"FISH":		 [-a*0.65, c*0.45]};
-    layout.locations(locations, scale);
+    layout.set_locations(locations, scale);
 }
 
 function circle(layout, random = false) {
-    var scale=200,
+    var scale=185,
         locations = {},
         th;
     layout.graph.nodes.forEach(function(d,i,A) {
@@ -1625,7 +1700,7 @@ function circle(layout, random = false) {
             Math.cos(th),
             Math.sin(th)+1];
     });
-    layout.locations(locations, scale);
+    layout.set_locations(locations, scale);
 }
 
 /* Submitting */
@@ -1645,9 +1720,45 @@ function submit_json(graph_json) {
     });
 }
 
-function download_json(graph_json) {
-    var data = "text/json;charset=utf-8," + encodeURIComponent(graph_json);
-    $('body').append('<a id="json_link" href="data:' + data + '" download="mugin.json">download JSON</a>')
+function download_json(json_object, filename="mugin.json") {
+    /*
+     * Calling this function triggers the download of a json file
+     * with the specified name, containing json_object.
+     *
+     */
+    var data = "text/json;charset=utf-8," + encodeURIComponent(json_object);
+    $('body').append('<a id="json_link" href="data:' + data + '" download="'+filename+'">download JSON</a>')
     $('#json_link')[0].click();
     $('#json_link')[0].remove();
+}
+
+function upload_json(callback, extension="json") {
+    /*
+     * Calling this function triggers a file-selection mask to
+     * upload a file with the specified extension using
+     * FileReader, and running the specified callback with the
+     * uploaded object as argument.
+     *
+     */
+    d3.select('body')
+        .append("input")
+        .attr("type", "file")
+        .attr("accept", "."+extension)
+        .attr("id", "json_upload")
+        .style("display", "none")
+        .on("change", function() {
+            var file = d3.event.target.files[0];
+            if (file) {
+                var reader = new FileReader();
+                reader.onloadend = function(evt) {
+                    // hardcode json parsing in upload
+                    var obj = JSON.parse(evt.target.result);
+                    console.log("UPJ",obj);
+                    callback(obj);
+                    $('#json_upload')[0].remove();
+                };
+                reader.readAsText(file);
+            }
+        });    
+    $('#json_upload')[0].click();
 }
